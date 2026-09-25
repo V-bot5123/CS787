@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+    <style>
+        body { background-color: #0e1117; color: #fafafa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .st-sidebar { background-color: #262730; }
+        .st-card { background-color: #1e1e1e; border: 1px solid #333; border-radius: 8px; }
+        .heatmap-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; height: 200px; }
+        .heat-cell { background: #3b82f6; border-radius: 2px; }
+        .heat-anomaly { background: #ef4444 !important; box-shadow: 0 0 10px #ef4444; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .typewriter { overflow: hidden; white-space: nowrap; border-right: 2px solid #8b5cf6; animation: typing 3s steps(40, end), blink-caret .75s step-end infinite; }
+        @keyframes typing { from { width: 0 } to { width: 100% } }
+        @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: #8b5cf6; } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <!-- STREAMLIT SIDEBAR -->
+    <div class="st-sidebar w-64 h-full p-5 flex flex-col shrink-0 border-r border-gray-700">
+        <h1 class="text-xl font-bold mb-6">⚙�? Pipeline Controls</h1>
+        
+        <div class="mb-4">
+            <label class="text-xs text-gray-400 mb-1 block">Underlying Asset</label>
+            <select class="w-full bg-[#0e1117] border border-gray-600 rounded p-2 text-sm text-white">
+                <option>NIFTY 50</option>
+                <option>RELIANCE</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="text-xs text-gray-400 mb-1 block">Analysis Date</label>
+            <input type="date" value="2026-09-21" class="w-full bg-[#0e1117] border border-gray-600 rounded p-2 text-sm text-white">
+        </div>
+
+        <div class="mb-4">
+            <label class="text-xs text-gray-400 mb-1 block">Loss Limit L (per contract)</label>
+            <input type="range" min="0" max="200" value="50" class="w-full">
+            <div class="text-right text-xs text-gray-400 mt-1">₹50 &mdash; scenario "survives" if hedged PnL ≥ &minus;L</div>
+        </div>
+
+        <button class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded mt-4 transition">
+            Run Pipeline
+        </button>
+
+        <div class="mt-auto text-xs text-gray-500">
+            Powered by Arbitrage-Penalized VolGAN Extension & LangGraph
+        </div>
+    </div>
+
+    <!-- STREAMLIT MAIN BODY -->
+    <div class="flex-1 h-full overflow-y-auto p-8">
+        <h1 class="text-3xl font-bold mb-2">Volatility Surface Arbitrage Terminal</h1>
+        <p class="text-gray-400 text-sm mb-6">End-of-day mispricing detection using Carr-Madan FFT, CNNs, and Generative Stress Testing.</p>
+
+        <!-- TOP METRICS -->
+        <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="st-card p-4">
+                <div class="text-gray-400 text-sm">Active Mispricings Found</div>
+                <div class="text-3xl font-bold text-red-400 mt-1">3</div>
+            </div>
+            <div class="st-card p-4">
+                <div class="text-gray-400 text-sm">Market Sentiment (India VIX)</div>
+                <div class="text-3xl font-bold text-blue-400 mt-1">14.2 <span class="text-sm">▼ 2%</span></div>
+            </div>
+            <div class="st-card p-4">
+                <div class="text-gray-400 text-sm">Simulated Hedged PnL (5% VaR)</div>
+                <div class="text-3xl font-bold text-green-400 mt-1">+₹14,500</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 mb-6">
+            <!-- VOLATILITY SURFACE VISUALIZATION -->
+            <div class="st-card p-5">
+                <h3 class="font-bold mb-1">2D Volatility Surface (Strike vs Expiry)</h3>
+                <p class="text-xs text-gray-400 mb-4">CNN Anomaly Detection Overlay</p>
+                <div class="heatmap-grid mb-2">
+                    <!-- generating a fake 10x10 heatmap grid via HTML -->
+                    <script>
+                        for(let i=0; i<100; i++) {
+                            let div = document.createElement('div');
+                            div.className = 'heat-cell';
+                            // Randomize blue opacity for standard cells
+                            div.style.opacity = (Math.random() * 0.5 + 0.3).toString();
+                            
+                            // Create exactly 1 anomaly
+                            if(i === 47) {
+                                div.className += ' heat-anomaly';
+                                div.style.opacity = '1';
+                                div.title = 'Mispricing Detected: NIFTY 25000 CE';
+                            }
+                            document.write(div.outerHTML);
+                        }
+                    </script>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500">
+                    <span>Near Expiry (Left) → Far Expiry (Right)</span>
+                    <span>OTM → ATM → ITM</span>
+                </div>
+            </div>
+
+            <!-- AI AGENT TERMINAL -->
+            <div class="st-card p-5 flex flex-col">
+                <h3 class="font-bold mb-1">LangGraph Agent Analysis</h3>
+                <p class="text-xs text-gray-400 mb-4">Translating CNN/GAN outputs to plain English</p>
+                
+                <div class="flex-1 bg-black border border-gray-700 rounded p-4 font-mono text-sm overflow-hidden flex flex-col gap-2">
+                    <div class="text-green-400">> Initializing Data Agents... Done.</div>
+                    <div class="text-green-400">> Per-expiry VG fit + Carr-Madan FFT + Black-Scholes inversion computed (model IV).</div>
+                    <div class="text-green-400">> CNN-LSTM-Attention flagged mispricing signal at coordinate (K:25000, T:14d).</div>
+                    <div class="text-blue-300">> Running 10,000 GAN stress scenarios (paper-faithful baseline + extension)...</div>
+                    <div class="text-blue-300">> Deterministic rule: survival ratio 88.4% ≥ threshold, CVaR within limit → <strong>EXECUTE</strong></div>
+                    <div class="text-yellow-400 mt-2">
+                        <strong>AGENT EXPLANATION</strong> <span class="text-gray-500 font-normal">(rule already decided — LLM explains only)</span>:
+                    </div>
+                    <div class="text-white typewriter whitespace-normal leading-relaxed">
+                        NIFTY 25000 CE is currently trading at ₹145 against a Carr-Madan/Black-Scholes model fair value of ₹162 (model IV vs. market IV). Across 10,000 hedged stress scenarios, 88.4% of outcomes stayed within the stated loss limit, so the deterministic rule returned EXECUTE — this is relative value against our own model, not riskless arbitrage.
+                        <br><br><span class="bg-green-600 text-white px-2 py-1 rounded font-bold">ACTION: EXECUTE (rule-based) — BUY to open position.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RAW DATA TABLE -->
+        <div class="st-card p-5">
+            <h3 class="font-bold mb-4">Raw Detection Log (Top Opportunities)</h3>
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-700">
+                        <th class="pb-2">Contract</th>
+                        <th class="pb-2">Market Price</th>
+                        <th class="pb-2">Fair Value (FFT)</th>
+                        <th class="pb-2">Price Gap</th>
+                        <th class="pb-2">Survival Ratio</th>
+                        <th class="pb-2">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-gray-800">
+                        <td class="py-3 font-mono text-blue-300">NIFTY26SEP25000CE</td>
+                        <td class="py-3">₹145.00</td>
+                        <td class="py-3">₹162.50</td>
+                        <td class="py-3 text-green-400">+12.06%</td>
+                        <td class="py-3">88.4%</td>
+                        <td class="py-3"><span class="bg-green-900 text-green-400 px-2 py-1 rounded text-xs font-bold">BUY</span></td>
+                    </tr>
+                    <tr class="border-b border-gray-800">
+                        <td class="py-3 font-mono text-blue-300">NIFTY26SEP24500PE</td>
+                        <td class="py-3">₹82.10</td>
+                        <td class="py-3">₹71.00</td>
+                        <td class="py-3 text-red-400">-15.63%</td>
+                        <td class="py-3">76.2%</td>
+                        <td class="py-3"><span class="bg-gray-700 text-gray-300 px-2 py-1 rounded text-xs font-bold">ABORT</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</body>
+</html>
+

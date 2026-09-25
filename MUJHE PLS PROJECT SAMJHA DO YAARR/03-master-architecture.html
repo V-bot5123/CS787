@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Master Architecture v3.2 — Explainer</title>
+<style>
+:root{--bg:#0a0d12;--panel:#11151d;--line:#232a36;--amber:#d9a441;--teal:#4fd1c5;--red:#e2483d;--green:#5fbf77;--text:#dfe4ec;--dim:#8b93a3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f1ea;--panel:#fff;--line:#ddd6c8;--text:#20242c;--dim:#5b6270}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,"SF Mono",Consolas,monospace;min-height:100%}
+header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 18px;z-index:10}
+h1{font-size:1rem;margin:0}h1 span{color:var(--amber)}
+.sub{color:var(--dim);font-size:.75rem;margin-top:4px}
+nav{display:flex;gap:4px;margin-top:12px;overflow-x:auto}
+nav button{background:transparent;border:1px solid var(--line);color:var(--dim);padding:7px 12px;border-radius:6px;font:inherit;font-size:.78rem;cursor:pointer;white-space:nowrap}
+nav button.active{color:var(--bg);background:var(--amber);border-color:var(--amber);font-weight:700}
+main{max-width:920px;margin:0 auto;padding:20px 18px 60px}
+section{display:none}section.active{display:block;animation:f .25s}
+@keyframes f{from{opacity:0}to{opacity:1}}
+h2{color:var(--amber);font-size:1.1rem;margin:0 0 8px}
+h3{color:var(--teal);font-size:.9rem;margin:16px 0 6px}
+p{font-size:.85rem;max-width:76ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0}
+.fix{display:inline-block;font-size:.65rem;background:rgba(217,164,65,.15);color:var(--amber);border:1px solid var(--amber);border-radius:4px;padding:1px 6px;margin-left:6px}
+ul{padding-left:18px;font-size:.83rem}li{margin:5px 0}
+.diagram{overflow-x:auto}svg{display:block;min-width:640px}
+.node rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5}
+.node text{fill:var(--text);font-size:10px}.node .lbl{fill:var(--amber);font-weight:700;font-size:10px}
+.flow{stroke:var(--dim);stroke-width:1.3;fill:none;marker-end:url(#a)}
+.pulse{fill:var(--teal)}
+table{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:6px}
+th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-size:.68rem;text-transform:uppercase}
+.warn{border-left:3px solid var(--red);padding-left:10px}
+</style></head>
+<body>
+<header>
+  <h1>MASTER ARCHITECTURE v3.2 <span>// explainer</span></h1>
+  <div class="sub">Master_Architecture_CORRECTED_v3.2.md — implements 27 corrections against the VolGAN paper</div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+<script>
+const tabs=[['rev','Revision Note'],['m1','Module 1'],['m2','Module 2'],['m3','Module 3'],['m4','Module 4'],['eval','Evaluation']];
+const nav=document.getElementById('nav');
+tabs.forEach(([id,l],i)=>{const b=document.createElement('button');b.textContent=l;b.id='n-'+id;b.onclick=()=>show(id);if(i===0)b.classList.add('active');nav.appendChild(b);});
+function show(id){document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.id==='n-'+id));}
+
+document.getElementById('main').innerHTML = `
+<section id="rev" class="active">
+  <h2>Revision note (v3.1 → v3.2)</h2>
+  <p>v3.1 fixed the header inconsistency and expanded the tail check to all four quantiles, but Module 3's header still called the module a <b>"Custom Arbitrage-Free GAN"</b> — self-contradicting, since nothing in this document or in VolGAN's own paper guarantees arbitrage-free output (Π is reported, not claimed to be zero). Renamed to <b>"Arbitrage-Penalized VolGAN Extension"</b> below, matching the deck, the mockup, and the Ultimate Blueprint. No other content changed.</p>
+  <div class="card diagram">
+    <svg viewBox="0 0 780 130">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--dim)"/></marker></defs>
+      <path class="flow" d="M110,65 H260"/><path class="flow" d="M360,65 H510"/><path class="flow" d="M610,65 H700"/>
+      <g class="node"><rect x="10" y="35" width="100" height="60" rx="6"/><text x="60" y="60" text-anchor="middle" class="lbl">M1</text><text x="60" y="75" text-anchor="middle">detect</text></g>
+      <g class="node"><rect x="260" y="35" width="100" height="60" rx="6"/><text x="310" y="60" text-anchor="middle" class="lbl">M2</text><text x="310" y="75" text-anchor="middle">compress</text></g>
+      <g class="node"><rect x="510" y="35" width="100" height="60" rx="6"/><text x="560" y="60" text-anchor="middle" class="lbl">M3</text><text x="560" y="75" text-anchor="middle">stress-test</text></g>
+      <g class="node"><rect x="700" y="35" width="70" height="60" rx="6"/><text x="735" y="60" text-anchor="middle" class="lbl">M4</text><text x="735" y="75" text-anchor="middle">decide</text></g>
+      <circle r="4" class="pulse"><animateMotion dur="2.2s" repeatCount="indefinite" path="M110,65 H700"/></circle>
+    </svg>
+  </div>
+</section>
+
+<section id="m1">
+  <h2>Module 1 — Discriminative Anomaly Detection</h2>
+  <p><b>Objective:</b> output a mispricing signal (not arbitrage) using like-for-like IV units.</p>
+  <ul>
+    <li><b>Input Grid</b><span class="fix">Fix 1.6, 3.8</span> — fixed grid in forward moneyness (m=K/F) and time-to-maturity (τ). Mask channel for missing quotes (zeros).</li>
+    <li><b>Pricing &amp; Inversion</b><span class="fix">Fix 1.1, 1.2</span> — (1) calibrate Variance Gamma per expiry, weights ∝ vega. (2) price using Carr-Madan FFT. (3) invert cell-by-cell via Newton's method on Black-Scholes, bracketing-solver fallback where vega is near zero.</li>
+    <li><b>Residuals</b><span class="fix">Fix 1.2, 1.7</span> — Residual = Market_IV − Model_IV. Computed with a leave-out fit. Filter noise using half the bid-ask spread (or volume/OI thresholds when no bid-ask data exists).</li>
+    <li><b>Network Architecture</b><span class="fix">Fix 1.4, 1.5</span> — sequence of L daily residual matrices (10–20 days). Fully convolutional CNN encodes each day into a feature map. LSTM runs across the L days; attention weights the days. Output: a per-cell score map (heatmap) where argmax is the coordinate.</li>
+    <li><b>Baselines &amp; Labels</b><span class="fix">Fix 1.3, 1.8</span> — baseline is a rolling z-score of residual cells. Ground-truth labels via synthetic bump injection and reversion criteria. Split chronologically, never randomly.</li>
+  </ul>
+</section>
+
+<section id="m2">
+  <h2>Module 2 — Dimensionality Reduction</h2>
+  <p><b>Objective:</b> compress smoothed surfaces into a "market-state latent" vector c.</p>
+  <ul>
+    <li><b>Data</b><span class="fix">Fix 3.7</span> — uses smoothed surfaces (Nadaraya-Watson), a deliberately different track from Module 1's raw data — smoothing would erase the anomalies Module 1 looks for.</li>
+    <li><b>Network</b><span class="fix">Fix 2.3</span> — VAE with small latent size (d ≈ 3 to 8), using KL warm-up or β-VAE to prevent posterior collapse.</li>
+    <li><b>Baseline</b><span class="fix">Fix 2.1</span> — must test against a PCA baseline of the same dimension d; VAE only claimed as an improvement if it actually wins on downstream survival ratio and hedging error, not reconstruction error alone.</li>
+  </ul>
+</section>
+
+<section id="m3">
+  <h2>Module 3 — Generative Stress-Testing (Arbitrage-Penalized VolGAN Extension)</h2>
+  <p><b>Objective:</b> generate realistic joint scenarios of returns and volatility increments.</p>
+  <ul>
+    <li><b>Input</b><span class="fix">Fix 1.9</span> — noise z + condition a_t (previous surface, past returns, 1-month realized vol) + VAE latent c.</li>
+    <li><b>Generator Output</b><span class="fix">Fix 3.1</span> — outputs the joint pair (R̂_t, Δĝ_t) — log return and log-IV increment together. Reproduces the empirical leverage effect: paper −0.76 in data, −0.84 in VolGAN.</li>
+    <li><b>Paper-Faithful Baseline</b><span class="fix">train first — Fix 3.2, 3.9</span> — small networks (Generator: 16 &amp; 32 neurons, noise dim 32; Discriminator: 16, 1). Trained with BCE + Sobolev smoothness penalties (L_m, L_τ). Weights chosen by gradient-norm matching over a 25-epoch pilot run. Arbitrage is NOT in this baseline's loss — handled post-generation via re-weighting exp(−β·Π).</li>
+    <li><b>Our Extensions</b><span class="fix">ablated, not replacing — Fix G1, 3.3, 3.5</span>
+      <ol style="margin:6px 0"><li>Full arbitrage penalty Π = p1+p2+p3 (calendar, monotonicity, and butterfly — not calendar alone) added directly to the generator's loss, computed via finite differences on relative call prices.</li>
+      <li>Wasserstein-GP objective as a separate ablation against the BCE baseline — changes the discriminator/critic's meaning and gradient scale, so gradient-norm matching is redone for it.</li></ol>
+      <span class="warn">Neither the baseline nor either extension is guaranteed arbitrage-free; Π is reported for all four variants, not assumed to be zero.</span></li>
+    <li><b>Tail Check</b><span class="fix">Fix 3.4</span> — run a Kupiec proportion-of-failures test on all four quantile levels: 1%, 2.5%, 97.5%, 99% — not just the first two. The paper's own numbers show its tails can be too thin: 25.32% of realized SPX returns fell below VolGAN's simulated 1% quantile with re-weighting, against a 1% nominal target. Test and report exceedance ratios honestly on NIFTY data before trusting any survival ratio.</li>
+  </ul>
+</section>
+
+<section id="m4">
+  <h2>Module 4 — Explainable AI &amp; Execution</h2>
+  <p><b>Objective:</b> deterministic trade evaluation; LLM for explanation only.</p>
+  <ul>
+    <li><b>Hedged PnL</b><span class="fix">Fix 3.1, 4.3</span> — using generated R̂_t and Δĝ_t, compute new spot and surface. Reprice the flagged trade and hedge via regression to get PnL_j.</li>
+    <li><b>Decision Rule</b><span class="fix">Fix 4.1, 4.3</span> — scenario survives if PnL_j ≥ −L. Compute survival ratio, 5% VaR, CVaR. EXECUTE/ABORT decided by a hard-coded, deterministic math rule — <b>never by the LLM</b>. Single highest-stakes fix in the project.</li>
+    <li><b>LLM Explanation</b><span class="fix">Fix 4.1, 4.2</span> — LLM receives structured JSON (PnL quantiles, VaR, worst scenario, Π statistics) and outputs a natural-language explanation of the decision already made — every number checked against the input JSON.</li>
+  </ul>
+</section>
+
+<section id="eval">
+  <h2>Evaluation Checklist<span class="fix">Fix E1</span></h2>
+  <p>Run for the paper-faithful baseline and each extension; present as an ablation table.</p>
+  <table><tbody>
+    <tr><td>1</td><td>Arbitrage penalty Π — mean/std/median, vs. market data, BCE-only GAN, raw VolGAN.</td></tr>
+    <tr><td>2</td><td>Smoothness — visual check against L_m, L_τ.</td></tr>
+    <tr><td>3</td><td>PCA structure — inner product of simulated vs. data eigenvectors (paper benchmark ≈0.9 for level/skew).</td></tr>
+    <tr><td>4</td><td>Correlations &amp; tails — asymmetric heavy tails vs. Gaussian; leverage-effect correlation.</td></tr>
+    <tr><td>5</td><td>Quantile exceedance at 1/2.5/97.5/99% (Kupiec test) — the tail-realism check; report honestly where results miss nominal.</td></tr>
+    <tr><td>6</td><td>Hedging — tracking error vs. Black-Scholes delta and delta-vega.</td></tr>
+    <tr><td>7</td><td>Module 1 detection — precision/recall vs. the z-score baseline.</td></tr>
+    <tr><td>8</td><td>Survival sensitivity — how the survival ratio moves with loss limit L, re-weighting β, and the latent c.</td></tr>
+  </tbody></table>
+  <p class="warn" style="margin-top:14px">Every fallback tier, if compute or data forces a cut, drops the Wasserstein-GP ablation and the VAE (use PCA instead) before dropping anything else — the paper-faithful VolGAN baseline, Module 1, and the survival test are the minimum coherent pipeline.</p>
+</section>
+`;
+</script>
+</body></html>

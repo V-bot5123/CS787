@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Academic Cheat Sheets — Explainer</title>
+<style>
+:root{--bg:#0a0d12;--panel:#11151d;--line:#232a36;--amber:#d9a441;--teal:#4fd1c5;--red:#e2483d;--text:#dfe4ec;--dim:#8b93a3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f1ea;--panel:#fff;--line:#ddd6c8;--text:#20242c;--dim:#5b6270}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,"SF Mono",Consolas,monospace;min-height:100%}
+header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 18px;z-index:10}
+h1{font-size:1rem;margin:0}h1 span{color:var(--amber)}
+.sub{color:var(--dim);font-size:.75rem;margin-top:4px}
+nav{display:flex;gap:4px;margin-top:12px;overflow-x:auto}
+nav button{background:transparent;border:1px solid var(--line);color:var(--dim);padding:7px 12px;border-radius:6px;font:inherit;font-size:.78rem;cursor:pointer;white-space:nowrap}
+nav button.active{color:var(--bg);background:var(--amber);border-color:var(--amber);font-weight:700}
+main{max-width:900px;margin:0 auto;padding:20px 18px 60px}
+section{display:none}section.active{display:block;animation:f .25s}
+@keyframes f{from{opacity:0}to{opacity:1}}
+h2{color:var(--amber);font-size:1.15rem;margin:0 0 10px}
+p{font-size:.85rem;max-width:76ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0}
+.diagram{overflow-x:auto}svg{display:block;min-width:600px}
+.node rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5;cursor:pointer}
+.node.active rect{stroke:var(--teal);stroke-width:2}
+.node text{fill:var(--text);font-size:10.5px}
+.node .lbl{fill:var(--amber);font-weight:700;font-size:10px}
+.flow{stroke:var(--dim);stroke-width:1.5;fill:none;marker-end:url(#a)}
+.pulse{fill:var(--teal)}
+.detail{margin-top:10px;font-size:.82rem}
+.detail ul{padding-left:18px;margin:6px 0}
+.detail li{margin:4px 0}
+.stat{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin:4px 6px 4px 0;font-size:.78rem}
+.stat b{color:var(--teal)}
+.warn{border-left:3px solid var(--red);padding-left:10px;color:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:8px}
+th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-size:.68rem;text-transform:uppercase}
+</style></head>
+<body>
+<header>
+  <h1>ACADEMIC CHEAT SHEETS <span>// explainer</span></h1>
+  <div class="sub">academic_cheat_sheets_FINAL.md — the 3 papers underpinning every module</div>
+  <nav id="nav"></nav>
+</header>
+<main id="main"></main>
+<script>
+const tabs=[['volgan','1 · VolGAN'],['carrmadan','2 · Carr-Madan FFT'],['vae','3 · VAE']];
+const nav=document.getElementById('nav');
+tabs.forEach(([id,l],i)=>{const b=document.createElement('button');b.textContent=l;b.id='n-'+id;b.onclick=()=>show(id);if(i===0)b.classList.add('active');nav.appendChild(b);});
+function show(id){document.querySelectorAll('section').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.id==='n-'+id));}
+
+document.getElementById('main').innerHTML=`
+<section id="volgan" class="active">
+  <h2>1 · VolGAN — Vuletić &amp; Cont (Oxford, Applied Mathematical Finance, 2024/25)</h2>
+  <p>Generative model producing arbitrage-<i>aware</i> (not arbitrage-guaranteed) implied volatility surfaces.</p>
+  <div class="card diagram">
+    <svg viewBox="0 0 760 150">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--dim)"/></marker></defs>
+      <path class="flow" d="M110,75 H190"/><path class="flow" d="M290,75 H370"/><path class="flow" d="M470,75 H550"/>
+      <g class="node" onclick="d('joint')"><rect x="10" y="45" width="100" height="60" rx="6"/><text x="60" y="65" text-anchor="middle" class="lbl">GENERATOR</text><text x="60" y="80" text-anchor="middle">joint (R̂,Δĝ)</text><text x="60" y="94" text-anchor="middle">leverage effect</text></g>
+      <g class="node" onclick="d('loss')"><rect x="190" y="45" width="100" height="60" rx="6"/><text x="240" y="65" text-anchor="middle" class="lbl">LOSS</text><text x="240" y="80" text-anchor="middle">BCE + Sobolev</text><text x="240" y="94" text-anchor="middle">L_m, L_τ</text></g>
+      <g class="node" onclick="d('arb')"><rect x="370" y="45" width="100" height="60" rx="6"/><text x="420" y="65" text-anchor="middle" class="lbl">ARBITRAGE</text><text x="420" y="80" text-anchor="middle">NOT in loss</text><text x="420" y="94" text-anchor="middle">tested, no gain</text></g>
+      <g class="node" onclick="d('reweight')"><rect x="550" y="45" width="100" height="60" rx="6"/><text x="600" y="65" text-anchor="middle" class="lbl">POST-GEN</text><text x="600" y="80" text-anchor="middle">re-weight</text><text x="600" y="94" text-anchor="middle">exp(−βΠ)</text></g>
+      <circle r="4" class="pulse"><animateMotion dur="2.4s" repeatCount="indefinite" path="M110,75 H550"/></circle>
+    </svg>
+  </div>
+  <div id="v-detail" class="card detail"></div>
+  <h2 style="margin-top:22px">How we use it (our extension)</h2>
+  <p>We do <b>not</b> replace VolGAN's method. We reproduce it as a baseline first — BCE + Sobolev + post-generation re-weighting — because the paper's own evaluation numbers are calibrated against that baseline. Then we run <b>two ablations</b>, each compared to the baseline, not assumed superior:</p>
+  <ol><li>Full 3-term arbitrage penalty (Π = p1+p2+p3: calendar, monotonicity, <i>and</i> butterfly) added directly to the generator's loss.</li>
+  <li>Swapping BCE for a Wasserstein-GP objective — changes what the discriminator/critic score means, needs its own gradient-norm-matching pass. Reported as an ablation, not adopted by default.</li></ol>
+  <p>We report the arbitrage-penalty distribution for all four variants (market data, BCE-only GAN, paper-faithful VolGAN, our extensions) side by side. <b class="warn">Neither extension is claimed "structurally arbitrage-free"</b> — nothing in the paper or our extension guarantees that.</p>
+</section>
+
+<section id="carrmadan">
+  <h2>2 · Option Valuation via FFT — Carr &amp; Madan (1999)</h2>
+  <p>Computes option <i>prices</i> across an entire strike grid at once, via numerical integration over the characteristic function.</p>
+  <div class="card diagram">
+    <svg viewBox="0 0 760 170">
+      <path class="flow" d="M110,85 H210"/><path class="flow" d="M330,85 H430"/><path class="flow" d="M550,85 H650"/>
+      <g class="node" onclick="d('fft')"><rect x="10" y="55" width="100" height="60" rx="6"/><text x="60" y="75" text-anchor="middle" class="lbl">FFT</text><text x="60" y="90" text-anchor="middle">char. function</text><text x="60" y="104" text-anchor="middle">→ prices</text></g>
+      <g class="node" onclick="d('newton')"><rect x="210" y="55" width="120" height="60" rx="6"/><text x="270" y="75" text-anchor="middle" class="lbl">INVERT</text><text x="270" y="90" text-anchor="middle">Newton on BS</text><text x="270" y="104" text-anchor="middle">(bracket fallback)</text></g>
+      <g class="node" onclick="d('modeliv')"><rect x="430" y="55" width="120" height="60" rx="6"/><text x="490" y="75" text-anchor="middle" class="lbl">MODEL IV</text><text x="490" y="90" text-anchor="middle">only now</text><text x="490" y="104" text-anchor="middle">comparable</text></g>
+      <g class="node" onclick="d('residual')"><rect x="650" y="55" width="100" height="60" rx="6"/><text x="700" y="75" text-anchor="middle" class="lbl">RESIDUAL</text><text x="700" y="90" text-anchor="middle">Mkt IV −</text><text x="700" y="104" text-anchor="middle">Model IV</text></g>
+      <circle r="4" class="pulse"><animateMotion dur="2.4s" repeatCount="indefinite" path="M110,85 H650"/></circle>
+    </svg>
+  </div>
+  <div id="c-detail" class="card detail"></div>
+</section>
+
+<section id="vae">
+  <h2>3 · Dimensionality Reduction — Variational Autoencoders</h2>
+  <p>Maps a high-dimensional input to a probability distribution (mean, variance), not a fixed point; trained to minimize KL divergence plus reconstruction error.</p>
+  <div class="card diagram">
+    <svg viewBox="0 0 760 150">
+      <path class="flow" d="M110,75 H230"/><path class="flow" d="M350,75 H470"/>
+      <g class="node" onclick="d('surface')"><rect x="10" y="45" width="100" height="60" rx="6"/><text x="60" y="70" text-anchor="middle" class="lbl">N×M</text><text x="60" y="86" text-anchor="middle">IV surface</text></g>
+      <g class="node" onclick="d('compress')"><rect x="230" y="45" width="120" height="60" rx="6"/><text x="290" y="65" text-anchor="middle" class="lbl">VAE / PCA</text><text x="290" y="80" text-anchor="middle">d ≈ 3–8</text><text x="290" y="94" text-anchor="middle">latent c</text></g>
+      <g class="node" onclick="d('validate')"><rect x="470" y="45" width="140" height="60" rx="6"/><text x="540" y="65" text-anchor="middle" class="lbl">VALIDATE</text><text x="540" y="80" text-anchor="middle">stress periods /</text><text x="540" y="94" text-anchor="middle">India VIX corr.</text></g>
+      <circle r="4" class="pulse"><animateMotion dur="2.4s" repeatCount="indefinite" path="M110,75 H470"/></circle>
+    </svg>
+  </div>
+  <div id="a-detail" class="card detail"></div>
+</section>
+`;
+
+const notes = {
+ joint:'<b>Joint output.</b> Generator outputs the pair (R̂_t, Δĝ_t) — underlying\'s return AND log-implied-vol increment, together. This is what lets the model reproduce the empirically observed negative correlation between spot returns and vol moves (the "leverage effect"): <span class="stat"><b>−0.76</b> in data</span><span class="stat"><b>−0.84</b> in VolGAN sims</span>.',
+ loss:'<b>Loss.</b> Standard binary cross-entropy (BCE) + two Sobolev smoothness penalties L_m and L_τ (discrete seminorms measuring roughness across moneyness and maturity), weights chosen by gradient-norm matching over a short pilot run.',
+ arb:'<b>Arbitrage is NOT in the training loss.</b> The paper\'s authors explicitly tested adding it and found "no notable difference" — they attribute arbitrage-consistency to the smoothness penalty acting indirectly.',
+ reweight:'<b>Post-generation correction.</b> Arbitrage is corrected after generation by re-weighting scenarios EBM-style: w_i ∝ exp(−β·Π_i), where Π is a 3-term penalty (calendar + monotonicity + butterfly violations).<br><br><b>Table 1 results:</b><table><tr><th>Variant</th><th>Mean Π</th></tr><tr><td>Market data</td><td>0.0096</td></tr><tr><td>BCE-only GAN (no smoothness)</td><td>2.4635 (~250× worse)</td></tr><tr><td>Raw VolGAN</td><td>0.0199</td></tr><tr><td>VolGAN + re-weighting</td><td>0.0127</td></tr></table>',
+ fft:'<b>What FFT gives you.</b> A "perfect," mathematically-dictated <i>price</i> grid across all strikes at once — not an implied volatility. It is not the final output of this step.',
+ newton:'<b>The step that must not be skipped.</b> Invert every price cell back to a model IV via Newton\'s method on Black-Scholes, with a bracketing-solver fallback where vega is near zero (deep OTM, very short maturity).',
+ modeliv:'<b>Only after inversion</b> do you subtract model IV from market IV to get the residual matrix.',
+ residual:'<b class="warn">Never subtract the raw price grid from the market IV grid directly</b> — that residual would scale with vega (huge near ATM, invisible in the wings) rather than being a meaningful mispricing signal.',
+ surface:'A full N×M volatility surface can\'t be fed into the GAN as a condition directly — it must be compressed first.',
+ compress:'The base paper\'s own PCA already explains <span class="stat"><b>~90%</b> of variance</span> with just 3 components (51.25% + 34.00% + 5.01%). So PCA is kept as a genuine baseline at the same latent dimension, not a straw man.',
+ validate:'Call c a <b>"market-state latent,"</b> never a "macroeconomic regime" — the VAE only ever sees IV surfaces, never macro data. Validate it by checking whether it separates known stress periods and correlates with India VIX, rather than asserting the interpretation.'
+};
+function d(key){
+  const map={joint:'v-detail',loss:'v-detail',arb:'v-detail',reweight:'v-detail',fft:'c-detail',newton:'c-detail',modeliv:'c-detail',residual:'c-detail',surface:'a-detail',compress:'a-detail',validate:'a-detail'};
+  document.getElementById(map[key]).innerHTML = notes[key];
+}
+d('joint'); d('fft'); d('surface');
+</script>
+</body></html>

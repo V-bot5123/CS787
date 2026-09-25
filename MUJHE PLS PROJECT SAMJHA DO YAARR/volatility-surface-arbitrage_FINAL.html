@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Volatility Surface Arbitrage — System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+
+    --bg: #0A0E14;
+    --bg-raised: #111823;
+    --bg-panel: #141B26;
+    --bg-panel-2: #1A2230;
+    --line: rgba(237,232,222,0.10);
+    --line-strong: rgba(237,232,222,0.20);
+    --text: #EEE9DE;
+    --text-dim: #9099A8;
+    --text-faint: #5C6577;
+    --amber: #D8A63C;
+    --amber-soft: rgba(216,166,60,0.14);
+    --teal: #4FB6AC;
+    --teal-soft: rgba(79,182,172,0.14);
+    --red: #C1594F;
+    --red-soft: rgba(193,89,79,0.14);
+    --green: #6FA97A;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+  /* fixed dark trading-terminal palette, held constant regardless of viewer preference */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  img, svg { max-width: 100%; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+  .scrollbox { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  ::selection { background: var(--amber-soft); color: var(--text); }
+
+  a { color: inherit; }
+  h1, h2, h3, h4 { font-family: var(--serif); font-weight: 500; margin: 0; color: var(--text); }
+  code, .mono, .eq { font-family: var(--mono); }
+  .eyebrow-num { font-family: var(--mono); font-size: 13px; color: var(--teal); letter-spacing: 0.02em; }
+
+  /* ---------- Nav ---------- */
+  nav.topnav {
+    position: sticky; top: 0; z-index: 50;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: rgba(10,14,20,0.82);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border-bottom: 1px solid var(--line);
+  }
+  .topnav-inner {
+    max-width: 1120px; margin: 0 auto; padding: 14px 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 14px; color: var(--text); white-space: nowrap; }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 10px var(--amber); flex: none; }
+  .navlinks { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; overflow-x: auto; }
+  .navlinks li { flex: none; }
+  .navlinks a {
+    display: block; text-decoration: none; font-size: 13.5px; color: var(--text-dim);
+    padding: 7px 12px; border-radius: 20px; transition: color .15s ease, background-color .15s ease;
+    white-space: nowrap;
+  }
+  .navlinks a:hover { color: var(--text); }
+  .navlinks a.active { color: var(--bg); background: var(--amber); }
+
+  /* ---------- Hero ---------- */
+  .hero { position: relative; padding: 76px 0 40px; overflow: hidden; }
+  .hero-mesh { position: absolute; inset: 0; z-index: 0; opacity: 0.55; pointer-events: none; }
+  .hero-inner { position: relative; z-index: 1; }
+  .kicker { font-family: var(--mono); font-size: 13px; color: var(--teal); margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  .kicker .rule { width: 32px; height: 1px; background: var(--teal); opacity: .6; }
+  h1.title { font-size: clamp(34px, 6vw, 62px); line-height: 1.04; letter-spacing: -0.01em; max-width: 15ch; }
+  h1.title em { font-style: italic; color: var(--amber); }
+  .lede { font-size: 17px; color: var(--text-dim); max-width: 56ch; margin-top: 22px; }
+  .hero-stats { display: flex; gap: 34px; margin-top: 40px; flex-wrap: wrap; }
+  .stat .num { font-family: var(--mono); font-size: 26px; color: var(--text); }
+  .stat .label { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+
+  /* pipeline strip */
+  .pipeline { margin-top: 56px; }
+  .pipeline-scroll { display: flex; align-items: stretch; gap: 0; min-width: 720px; }
+  .pnode { flex: 1; position: relative; padding: 16px 18px 16px 0; cursor: pointer; }
+  .pnode:last-child { padding-right: 0; }
+  .pnode .pn-top { display: flex; align-items: center; gap: 10px; }
+  .pnode .pn-index { font-family: var(--mono); font-size: 12px; color: var(--text-faint); border: 1px solid var(--line-strong); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; transition: all .2s ease; flex: none; }
+  .pnode .pn-line { flex: 1; height: 1px; background: var(--line-strong); position: relative; }
+  .pnode:last-child .pn-line { display: none; }
+  .pnode .pn-name { margin-top: 12px; font-size: 13.5px; color: var(--text-dim); transition: color .2s ease; }
+  .pnode .pn-tag { font-family: var(--mono); font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+  .pnode:hover .pn-index, .pnode.inview .pn-index { border-color: var(--amber); color: var(--amber); }
+  .pnode:hover .pn-name, .pnode.inview .pn-name { color: var(--text); }
+
+  /* ---------- Section shell ---------- */
+  section.phase { padding: 96px 0; border-top: 1px solid var(--line); position: relative; }
+  .phase-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 44px; flex-wrap: wrap; }
+  .phase-head .pnum { font-family: var(--mono); font-size: 15px; color: var(--amber); }
+  .phase-head h2 { font-size: clamp(26px, 3.4vw, 38px); }
+  .phase-sub { font-family: var(--mono); font-size: 12.5px; color: var(--teal); background: var(--teal-soft); padding: 4px 10px; border-radius: 3px; }
+
+  .grid2 { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 56px; align-items: start; }
+  @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; gap: 40px; } }
+
+  .body-text { font-size: 15.5px; color: var(--text-dim); max-width: 58ch; }
+  .body-text p { margin: 0 0 16px; }
+  .body-text strong { color: var(--text); font-weight: 500; }
+
+  /* flow mini diagram: input -> math -> output */
+  .flow3 { display: flex; align-items: stretch; gap: 0; margin: 28px 0 8px; }
+  .flow3 .fbox { flex: 1; background: var(--bg-panel); border: 1px solid var(--line); border-radius: 4px; padding: 14px 14px; position: relative; }
+  .flow3 .fbox .flabel { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); text-transform: lowercase; }
+  .flow3 .fbox .fval { font-size: 13px; color: var(--text); margin-top: 6px; line-height: 1.4; }
+  .flow3 .farrow { flex: none; width: 26px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); font-size: 15px; }
+
+  /* equation / math card */
+  .mathcard {
+    background: var(--bg-panel); border: 1px solid var(--teal-soft); border-left: 2px solid var(--teal);
+    border-radius: 4px; padding: 20px 22px; margin-top: 22px;
+  }
+  .mathcard .mtitle { font-family: var(--mono); font-size: 11px; color: var(--teal); margin-bottom: 12px; }
+  .mathcard .eq { font-size: 14.5px; color: var(--text); line-height: 2; }
+  .mathcard .eq .desc { color: var(--text-faint); font-family: var(--sans); font-size: 12.5px; }
+
+  /* versus / competitor toggle */
+  .versus { margin-top: 30px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .versus-tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .versus-tabs button {
+    flex: 1; background: none; border: none; color: var(--text-faint); font-family: var(--sans);
+    font-size: 13px; padding: 11px 10px; cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s ease;
+  }
+  .versus-tabs button.active.us { color: var(--amber); border-bottom-color: var(--amber); }
+  .versus-tabs button.active.them { color: var(--red); border-bottom-color: var(--red); }
+  .versus-panel { padding: 16px 18px; font-size: 14px; color: var(--text-dim); display: none; }
+  .versus-panel.show { display: block; }
+  .versus-panel .who { font-family: var(--mono); font-size: 11.5px; margin-bottom: 8px; }
+  .versus-panel.us .who { color: var(--amber); }
+  .versus-panel.them .who { color: var(--red); }
+
+  /* analogy callout */
+  .analogy { display: flex; gap: 16px; margin-top: 26px; align-items: flex-start; }
+  .analogy .aicon { flex: none; width: 52px; height: 52px; }
+  .analogy .atext { font-size: 14px; color: var(--text-dim); font-style: italic; padding-top: 4px; }
+  .analogy .atext strong { color: var(--text); font-style: normal; }
+
+  /* handoff */
+  .handoff { margin-top: 46px; padding-top: 22px; border-top: 1px dashed var(--line); display: flex; gap: 12px; align-items: baseline; font-size: 13px; color: var(--text-faint); }
+  .handoff .arrow { color: var(--amber); }
+
+  /* panel (right column interactive widgets) */
+  .panel { background: var(--bg-panel); border: 1px solid var(--line); border-radius: 6px; padding: 22px; }
+  .panel .ptitle { font-family: var(--mono); font-size: 11px; color: var(--text-faint); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .panel .ptitle .live { color: var(--green); }
+
+  .btn {
+    font-family: var(--mono); font-size: 12.5px; background: var(--amber); color: #14100a; border: none;
+    padding: 9px 16px; border-radius: 4px; cursor: pointer; transition: filter .15s ease; font-weight: 600;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.secondary { background: transparent; color: var(--teal); border: 1px solid var(--teal); }
+
+  .toggle-row { display: flex; gap: 8px; margin-bottom: 18px; }
+  .toggle-row button {
+    font-family: var(--mono); font-size: 12px; background: var(--bg-raised); color: var(--text-dim);
+    border: 1px solid var(--line); padding: 7px 12px; border-radius: 4px; cursor: pointer;
+  }
+  .toggle-row button.active { color: var(--bg); background: var(--teal); border-color: var(--teal); }
+
+  input[type="range"] { width: 100%; accent-color: var(--teal); }
+
+  /* --- conclusion / recap strip --- */
+  .recap { padding: 100px 0; }
+  .recap-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; margin-top: 44px; }
+  @media (max-width: 900px) { .recap-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .recap-grid { grid-template-columns: 1fr; } }
+  .recap-card { border: 1px solid var(--line); border-radius: 6px; padding: 18px; background: var(--bg-panel); }
+  .recap-card .rn { font-family: var(--mono); font-size: 11px; color: var(--amber); }
+  .recap-card h4 { font-size: 15px; margin-top: 8px; }
+  .recap-card p { font-size: 12.5px; color: var(--text-faint); margin: 8px 0 0; line-height: 1.5; }
+
+  footer { padding: 48px 0 calc(48px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
+  footer .fwrap { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  footer .fnote { font-family: var(--mono); font-size: 12px; color: var(--text-faint); }
+
+  .fade-up { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+  .fade-up.seen { opacity: 1; transform: translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* terminal output block for phase 5 */
+  .terminal { background: #0D1218; border: 1px solid var(--line-strong); border-radius: 6px; padding: 18px 20px; font-family: var(--mono); font-size: 13px; color: var(--text-dim); min-height: 108px; }
+  .terminal .tprompt { color: var(--teal); }
+  .terminal .caret { display: inline-block; width: 7px; height: 14px; background: var(--amber); vertical-align: middle; animation: blink 1s step-end infinite; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  ::-webkit-scrollbar { height: 6px; width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <div class="brand"><span class="dot"></span>VOL·SURFACE / ARBITRAGE SYSTEM</div>
+    <ul class="navlinks" id="navlinks">
+      <li><a href="#p1" data-target="p1">Ground truth</a></li>
+      <li><a href="#p2" data-target="p2">Detection</a></li>
+      <li><a href="#p3" data-target="p3">Compression</a></li>
+      <li><a href="#p4" data-target="p4">Stress test</a></li>
+      <li><a href="#p5" data-target="p5">Explainability</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero">
+  <svg class="hero-mesh" id="heroMesh" viewBox="0 0 1200 520" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="wrap hero-inner">
+    <div class="kicker"><span class="rule"></span>five-phase research pipeline · NIFTY options</div>
+    <h1 class="title">Finding the <em>five basis points</em> the market forgot to price.</h1>
+    <p class="lede">A theoretical surface tells you what an option should cost. A neural network finds where reality disagrees. A generative model asks the disagreement 10,000 hard questions before any capital moves. This is the architecture, end to end.</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="num">5</div><div class="label">model stages</div></div>
+      <div class="stat"><div class="num">10,000</div><div class="label">synthetic futures generated</div></div>
+      <div class="stat"><div class="num">8,500</div><div class="label">simulated survivals / 10k</div></div>
+      <div class="stat"><div class="num">95%</div><div class="label">example anomaly confidence</div></div>
+    </div>
+
+    <div class="pipeline">
+      <div class="scrollbox">
+        <div class="pipeline-scroll" id="pipelineStrip">
+          <div class="pnode" data-target="p1"><div class="pn-top"><span class="pn-index">1</span><span class="pn-line"></span></div><div class="pn-name">Ground truth baseline</div><div class="pn-tag">Carr–Madan FFT</div></div>
+          <div class="pnode" data-target="p2"><div class="pn-top"><span class="pn-index">2</span><span class="pn-line"></span></div><div class="pn-name">Detection &amp; weighting</div><div class="pn-tag">CNN · LSTM · Attention · DNN</div></div>
+          <div class="pnode" data-target="p3"><div class="pn-top"><span class="pn-index">3</span><span class="pn-line"></span></div><div class="pn-name">Dimensionality reduction</div><div class="pn-tag">Variational Autoencoder</div></div>
+          <div class="pnode" data-target="p4"><div class="pn-top"><span class="pn-index">4</span><span class="pn-line"></span></div><div class="pn-name">Generative stress test</div><div class="pn-tag">Custom GAN</div></div>
+          <div class="pnode" data-target="p5"><div class="pn-top"><span class="pn-index">5</span><span class="pn-line"></span></div><div class="pn-name">Explainability</div><div class="pn-tag">LangGraph LLM</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- PHASE 1 -->
+  <section class="phase" id="p1">
+    <div class="wrap">
+      <div class="phase-head fade-up">
+        <span class="pnum">01 / 05</span>
+        <h2>The ground truth baseline</h2>
+        <span class="phase-sub">Carr–Madan (1999) FFT</span>
+      </div>
+      <div class="grid2">
+        <div class="body-text fade-up">
+          <p>Before a system can call anything mispriced, it needs an honest reference for what <strong>correct</strong> looks like. That reference is built once, mathematically, with no learning involved.</p>
+          <p>Raw NIFTY inputs — spot, strike, time to expiry, the risk-free rate — feed a Fourier-transform pricer that integrates over the characteristic function of the return distribution. The payoff is speed: instead of pricing one option at a time, the FFT produces an entire grid of theoretical prices in one pass, which is what makes a full, continuous <strong>volatility surface</strong> computationally realistic to hold in memory.</p>
+          <p>That FFT price grid is inverted to a model implied-volatility surface (per-expiry Variance Gamma calibration, then Newton inversion on Black&ndash;Scholes) before anything is compared &mdash; the gap between that <strong>model IV</strong> and the messy, real, quoted <strong>market IV</strong> is where every anomaly this system will ever find actually lives.</p>
+
+          <div class="flow3">
+            <div class="fbox"><div class="flabel">input</div><div class="fval">Spot · strike · time-to-expiry · risk-free rate</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">output</div><div class="fval">Per-expiry VG fit &rarr; FFT prices &rarr; Black-Scholes-inverted model IV</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">handoff</div><div class="fval">Compared IV-for-IV (leave-out fit) against market IV in Phase 2</div></div>
+          </div>
+
+          <div class="mathcard">
+            <div class="mtitle">math involved</div>
+            <div class="eq">C(K,T) = FFT[ φ(u) · e<sup>−iu·ln(K)</sup> ]<br><span class="desc">numerical integration over the characteristic function φ, computed across the whole strike grid at once</span><br>then inverted cell-by-cell via Newton's method on Black-Scholes to get <em>model IV</em> (never compared to market IV as a raw price) <span class="desc">this step is what makes Phase 2's subtraction like-for-like</span></div>
+          </div>
+
+          <div class="versus" data-group="v1">
+            <div class="versus-tabs">
+              <button class="active us" data-panel="us">Our approach</button>
+              <button class="them" data-panel="them">Black-Scholes</button>
+            </div>
+            <div class="versus-panel us show"><div class="who">carr–madan fft</div>Lets volatility bend into smiles and jumps across strikes — because that's how NIFTY actually trades.</div>
+            <div class="versus-panel them"><div class="who">black-scholes</div>Assumes one constant volatility for every strike. A flat line drawn through a market that is anything but flat.</div>
+          </div>
+
+          <div class="analogy">
+            <svg class="aicon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="16" width="44" height="24" rx="3" stroke="var(--amber)" stroke-width="1.6"/>
+              <circle cx="15" cy="42" r="4" stroke="var(--amber)" stroke-width="1.6"/>
+              <circle cx="37" cy="42" r="4" stroke="var(--amber)" stroke-width="1.6"/>
+              <path d="M9 16L14 8H38L43 16" stroke="var(--amber)" stroke-width="1.6" stroke-linejoin="round"/>
+              <line x1="4" y1="26" x2="48" y2="26" stroke="var(--amber)" stroke-width="1" opacity="0.4"/>
+            </svg>
+            <div class="atext">Think of it as the <strong>Kelley Blue Book</strong> of options. Before you can call any single car a bargain or a rip-off, you need an exact, independent guide to what every car should cost.</div>
+          </div>
+        </div>
+
+        <div class="panel fade-up">
+          <div class="ptitle">flat vs. smile <span class="live">�? live</span></div>
+          <svg id="smileChart" viewBox="0 0 400 220" width="100%"></svg>
+          <div class="toggle-row">
+            <button class="active" data-smile="flat">Black-Scholes</button>
+            <button data-smile="smile">Carr-Madan</button>
+          </div>
+          <div style="font-size:12.5px;color:var(--text-faint);">Implied volatility across strikes. Flip the toggle — the flat competitor line can't bend to fit where the smile actually trades.</div>
+        </div>
+      </div>
+
+      <div class="handoff"><span class="arrow">↳</span> This perfect surface becomes the subtraction target the moment real market quotes arrive — continue to Phase 2.</div>
+    </div>
+  </section>
+
+  <!-- PHASE 2 -->
+  <section class="phase" id="p2">
+    <div class="wrap">
+      <div class="phase-head fade-up">
+        <span class="pnum">02 / 05</span>
+        <h2>Detection &amp; temporal weighting</h2>
+        <span class="phase-sub">CNN · LSTM · Attention · DNN</span>
+      </div>
+
+      <div class="grid2">
+        <div class="body-text fade-up">
+          <p>Subtract the model IV surface (Phase 1) from the real, quoted market IV and what's left is a <strong>residual matrix</strong> &mdash; computed with a leave-out fit, and filtered against the bid-ask spread so illiquid noise isn't mistaken for a signal. We call this a <strong>mispricing signal</strong>, not an arbitrage &mdash; it is relative value against our own model, not a riskless profit. Four components take turns interrogating that map.</p>
+          <p>A <strong>CNN</strong> runs convolutional filters across it to read spatial gradients &mdash; the shape of the disagreement. An <strong>LSTM</strong> carries that shape forward across ten trading days, holding a memory of how it's evolving. An <strong>attention</strong> layer then decides which of those ten days actually matter, assigning each a weight. A final <strong>DNN</strong> collapses everything into a per-cell score map: a mispricing signal with a confidence score attached. Labels for training come from synthetic bump injection and a reversion criterion (never from the residual threshold itself), and a rolling z-score is kept as the baseline this stack has to beat.</p>
+
+          <div class="flow3">
+            <div class="fbox"><div class="flabel">input</div><div class="fval">Residual = market IV &minus; model IV (leave-out fit)</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">output</div><div class="fval">"Anomaly at NIFTY 21500, 95% confidence"</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">handoff</div><div class="fval">Triggers stress-testing in Phases 3–4</div></div>
+          </div>
+
+          <div class="mathcard">
+            <div class="mtitle">math involved</div>
+            <div class="eq">
+              ∇R &nbsp;<span class="desc">— CNN spatial gradient over the residual</span><br>
+              f<sub>t</sub>, i<sub>t</sub> &nbsp;<span class="desc">— LSTM forget / input gates across 10 days</span><br>
+              softmax(α) → 0.80 &nbsp;<span class="desc">— attention weight on the loudest day</span><br>
+              y = w·x + b &nbsp;<span class="desc">— DNN's final linear read-out</span>
+            </div>
+          </div>
+
+          <div class="versus" data-group="v2">
+            <div class="versus-tabs">
+              <button class="active us" data-panel="us">Our approach</button>
+              <button class="them" data-panel="them">Dense networks</button>
+            </div>
+            <div class="versus-panel us show"><div class="who">cnn + lstm + attention</div>The CNN keeps the surface's 2D shape intact; the LSTM and attention layer keep a memory of time. Neither gets thrown away.</div>
+            <div class="versus-panel them"><div class="who">standard mlp</div>Flattens the surface into a list of numbers, destroying its geometry, and has no built-in notion of "yesterday" at all.</div>
+          </div>
+
+          <div class="analogy">
+            <svg class="aicon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="10" width="40" height="28" rx="2" stroke="var(--amber)" stroke-width="1.6"/>
+              <circle cx="26" cy="24" r="7" stroke="var(--amber)" stroke-width="1.6"/>
+              <circle cx="26" cy="24" r="2.4" fill="var(--amber)"/>
+              <rect x="20" y="6" width="12" height="5" rx="1" stroke="var(--amber)" stroke-width="1.4"/>
+              <line x1="6" y1="44" x2="46" y2="44" stroke="var(--amber)" stroke-width="1.6"/>
+              <line x1="10" y1="44" x2="10" y2="48" stroke="var(--amber)" stroke-width="1.6"/>
+              <line x1="42" y1="44" x2="42" y2="48" stroke="var(--amber)" stroke-width="1.6"/>
+            </svg>
+            <div class="atext">The CNN takes a <strong>photograph</strong> of the crime scene. The LSTM turns it into a <strong>ten-day security video</strong>. Attention skips straight to the five seconds where the crime actually happened.</div>
+          </div>
+        </div>
+
+        <div class="panel fade-up">
+          <div class="ptitle">attention weights, last 10 sessions <span class="live">�? hover a day</span></div>
+          <svg id="attnChart" viewBox="0 0 400 200" width="100%"></svg>
+          <div id="attnReadout" style="font-family:var(--mono);font-size:12.5px;color:var(--text-dim);margin-top:8px;">day 7 → weight 0.80 → the session attention locked onto</div>
+        </div>
+      </div>
+
+      <div class="handoff"><span class="arrow">↳</span> A confirmed anomaly doesn't get traded yet — it gets compressed, then stress-tested, in Phases 3 and 4.</div>
+    </div>
+  </section>
+
+  <!-- PHASE 3 -->
+  <section class="phase" id="p3">
+    <div class="wrap">
+      <div class="phase-head fade-up">
+        <span class="pnum">03 / 05</span>
+        <h2>Dimensionality reduction</h2>
+        <span class="phase-sub">Variational Autoencoder</span>
+      </div>
+
+      <div class="grid2">
+        <div class="body-text fade-up">
+          <p>A full volatility surface is hundreds of data points wide. Before it can condition a generative model, it has to become small enough to actually hand off — while keeping the information that matters.</p>
+          <p>A VAE encoder maps the raw surface into a probabilistic latent distribution &mdash; a mean &mu; and variance &sigma;&sup2; for each latent dimension &mdash; and is trained to minimize KL divergence (with KL warm-up, to avoid the latent collapsing and carrying no information). What comes out the other side is a tiny vector, three to eight numbers, that this pipeline calls the <strong>market-state latent</strong>. We deliberately keep it small: the base paper's own PCA already explains ~90% of the surface's variance with 3 components, so the VAE only earns its place if it beats a PCA baseline of the same size on downstream survival and hedging metrics.</p>
+
+          <div class="flow3">
+            <div class="fbox"><div class="flabel">input</div><div class="fval">Raw 3D surface, hundreds of points</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">output</div><div class="fval">Market-state latent — e.g. [0.9, 0.1, 0.5]</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">handoff</div><div class="fval">Becomes the generative model's condition c in Phase 4</div></div>
+          </div>
+
+          <div class="mathcard">
+            <div class="mtitle">math involved</div>
+            <div class="eq">q(z|x) = �?��(μ(x), σ²(x))<br>ℒ = �?��[log p(x|z)] − D<sub>KL</sub>(q(z|x) ‖ p(z))<br><span class="desc">reconstruct the surface, while keeping the latent space smooth</span></div>
+          </div>
+
+          <div class="versus" data-group="v3">
+            <div class="versus-tabs">
+              <button class="active us" data-panel="us">Our approach</button>
+              <button class="them" data-panel="them">PCA</button>
+            </div>
+            <div class="versus-panel us show"><div class="who">variational autoencoder</div>Can learn a non-linear compression, which matters if the surface warps in ways straight lines can't follow &mdash; but this is tested, not assumed.</div>
+            <div class="versus-panel them"><div class="who">principal component analysis</div>Kept as our baseline at the same latent size &mdash; strong on this data (top 3 components already explain most of the variance), and the VAE has to beat it, not just replace it.</div>
+          </div>
+
+          <div class="analogy">
+            <svg class="aicon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="7" y="8" width="38" height="30" rx="2" stroke="var(--amber)" stroke-width="1.6"/>
+              <path d="M13 14h26M13 20h26M13 26h18" stroke="var(--amber)" stroke-width="1.2" opacity="0.7"/>
+              <rect x="20" y="40" width="12" height="8" rx="1.5" stroke="var(--amber)" stroke-width="1.6"/>
+            </svg>
+            <div class="atext">A massive, uncompressed <strong>4K movie file</strong> — the raw market — squeezed into a tiny <strong>zip file</strong>, so it's small enough to email straight to the GAN without crashing anything.</div>
+          </div>
+        </div>
+
+        <div class="panel fade-up">
+          <div class="ptitle">compression ratio <span class="live" id="compressLabel">300 → 3</span></div>
+          <svg id="compressChart" viewBox="0 0 400 220" width="100%"></svg>
+          <input type="range" id="compressSlider" min="0" max="100" value="0">
+          <div style="font-size:12.5px;color:var(--text-faint);margin-top:6px;">Drag to watch raw surface points collapse into the market-state latent [0.9, 0.1, 0.5].</div>
+        </div>
+      </div>
+
+      <div class="handoff"><span class="arrow">↳</span> The market-state latent becomes the condition our generative model is told to generate inside &mdash; continue to Phase 4.</div>
+    </div>
+  </section>
+
+  <!-- PHASE 4 -->
+  <section class="phase" id="p4">
+    <div class="wrap">
+      <div class="phase-head fade-up">
+        <span class="pnum">04 / 05</span>
+        <h2>Generative stress testing</h2>
+        <span class="phase-sub">Arbitrage-Penalized VolGAN Extension</span>
+      </div>
+
+      <div class="grid2">
+        <div class="body-text fade-up">
+          <p>An anomaly is only worth trading if it survives what the future might actually do. Our generator takes random noise and the compressed market-state latent, and generates thousands of futures for the <em>joint</em> pair (return, log-IV increment) &mdash; matching the base paper, which VolGAN's authors found necessary to reproduce the observed negative link between spot moves and volatility moves.</p>
+          <p>We train two versions and compare them, rather than assuming the fancier one wins. The <strong>paper-faithful baseline</strong> uses binary cross-entropy plus Sobolev smoothness penalties (L<sub>m</sub>, L<sub>&tau;</sub>) on moneyness and maturity, weighted by gradient-norm matching &mdash; this is what keeps VolGAN's surfaces smooth, and arbitrage is corrected afterward by re-weighting scenarios, not built into the loss. Our <strong>extension</strong> adds an explicit arbitrage penalty &Pi; = p&#8321; + p&#8322; + p&#8323; (calendar, monotonicity, and butterfly violations, not just calendar) directly into the loss, and separately ablates a Wasserstein-GP objective against the BCE baseline. Neither surface is guaranteed arbitrage-free &mdash; we report the penalty, we don't assume it's zero.</p>
+
+          <div class="flow3">
+            <div class="fbox"><div class="flabel">input</div><div class="fval">Gaussian noise z + market-state latent c</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">output</div><div class="fval">10,000 synthetic future surfaces</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">handoff</div><div class="fval">Survival win-rate passed to the LLM in Phase 5</div></div>
+          </div>
+
+          <div class="mathcard">
+            <div class="mtitle">math involved &mdash; baseline vs. extension</div>
+            <div class="eq">J<sup>(G)</sup> = &minus;&#189;E[log D(a,G)] + &alpha;<sub>m</sub>E[L<sub>m</sub>] + &alpha;<sub>&tau;</sub>E[L<sub>&tau;</sub>] &nbsp;<span class="desc">paper baseline: BCE + Sobolev smoothness, weights by gradient-norm matching</span><br>+ &alpha;<sub>&Pi;</sub>E[&Pi;] &nbsp;<span class="desc">our extension: full 3-term arbitrage penalty &Pi; = p&#8321;+p&#8322;+p&#8323; added to the loss</span><br>min<sub>G</sub> max<sub>D</sub> &minus;E[D(x)] + E[D(G)] + &lambda;&middot;gp &nbsp;<span class="desc">separate ablation: Wasserstein-GP objective, compared against the BCE baseline above, not a replacement for it</span></div>
+          </div>
+
+          <div class="versus" data-group="v4">
+            <div class="versus-tabs">
+              <button class="active us" data-panel="us">Our approach</button>
+              <button class="them" data-panel="them">Monte Carlo</button>
+            </div>
+            <div class="versus-panel us show"><div class="who">our extension</div>Adds the full 3-term arbitrage penalty directly into training, on top of the paper's post-generation re-weighting &mdash; whether that produces scenarios closer to the tails real markets show is exactly what the Kupiec exceedance test in evaluation checks, not something we assume going in; we report the residual penalty rather than claim zero.</div>
+            <div class="versus-panel them"><div class="who">monte carlo / plain gan</div>Monte Carlo assumes a bell curve that breaks exactly when a black-swan crash happens. A plain BCE-only GAN with no smoothness penalty produces visibly jagged, badly arbitraged surfaces &mdash; that's the specific failure the smoothness penalty (not the GAN architecture alone) is there to fix.</div>
+          </div>
+
+          <div class="analogy">
+            <svg class="aicon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 30L24 12L46 24L30 30L34 46L24 34L14 44L18 28Z" stroke="var(--amber)" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+            <div class="atext">A <strong>flight simulator</strong>. Before real passengers ever board, you throw 10,000 synthetic hurricanes at the airframe to see whether the wings hold.</div>
+          </div>
+        </div>
+
+        <div class="panel fade-up">
+          <div class="ptitle">simulation run <span class="live" id="simStatus">idle</span></div>
+          <svg id="simChart" viewBox="0 0 400 190" width="100%"></svg>
+          <button class="btn" id="runSim" style="margin-top:14px;">Run 10,000 simulations</button>
+          <div style="font-size:12.5px;color:var(--text-faint);margin-top:12px;">Each bar is the Π (arbitrage-penalty) distribution across a batch of generated surfaces — high-Π scenarios are down-weighted, not discarded; nothing here is claimed to be structurally arbitrage-free.</div>
+        </div>
+      </div>
+
+      <div class="handoff"><span class="arrow">↳</span> A survival rate is a number. Someone still has to explain what it means — continue to Phase 5.</div>
+    </div>
+  </section>
+
+  <!-- PHASE 5 -->
+  <section class="phase" id="p5">
+    <div class="wrap">
+      <div class="phase-head fade-up">
+        <span class="pnum">05 / 05</span>
+        <h2>Explainability &amp; evaluation</h2>
+        <span class="phase-sub">LangGraph · multi-agent LLM</span>
+      </div>
+
+      <div class="grid2">
+        <div class="body-text fade-up">
+          <p>Everything upstream produces tensors and probabilities. Nothing upstream produces a sentence a human can act on. That's the job of the final stage.</p>
+          <p>A deterministic rule makes the call first: each of the 10,000 scenarios reprices and hedges the flagged trade, and a scenario "survives" if its hedged PnL clears a stated loss limit &mdash; the EXECUTE/ABORT decision is a hard-coded threshold on that survival ratio and CVaR, nothing a language model chooses. A multi-agent LLM then ingests the anomaly coordinates from Phase 2 and the survival statistics from Phase 4 as structured JSON, and explains &mdash; in plain English, with every number it quotes checked against that JSON &mdash; the decision the rule already made.</p>
+
+          <div class="flow3">
+            <div class="fbox"><div class="flabel">input</div><div class="fval">Survival stats + anomaly coordinates</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">output</div><div class="fval">Plain-English explanation of a deterministic EXECUTE/ABORT rule</div></div>
+            <div class="farrow">→</div>
+            <div class="fbox"><div class="flabel">handoff</div><div class="fval">Rendered on the Streamlit dashboard</div></div>
+          </div>
+
+          <div class="versus" data-group="v5">
+            <div class="versus-tabs">
+              <button class="active us" data-panel="us">Our approach</button>
+              <button class="them" data-panel="them">Hard-coded rules</button>
+            </div>
+            <div class="versus-panel us show"><div class="who">multi-agent llm</div>Can ingest a mass of tensor data across every prior stage and put the deterministic decision into a rationale a human can act on &mdash; it explains the rule's output, it never overrides it.</div>
+            <div class="versus-panel them"><div class="who">if / then logic</div>Hard-coded print statements can't adapt to a multi-variable quantitative context — they only ever check the branches someone thought to write.</div>
+          </div>
+
+          <div class="analogy">
+            <svg class="aicon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="18" width="40" height="24" rx="2" stroke="var(--amber)" stroke-width="1.6"/>
+              <rect x="6" y="10" width="40" height="6" rx="1.5" stroke="var(--amber)" stroke-width="1.6"/>
+              <circle cx="14" cy="30" r="2" fill="var(--amber)"/>
+              <line x1="20" y1="29" x2="40" y2="29" stroke="var(--amber)" stroke-width="1.2"/>
+              <line x1="20" y1="34" x2="34" y2="34" stroke="var(--amber)" stroke-width="1.2" opacity="0.6"/>
+            </svg>
+            <div class="atext">The CNN and the GAN are the <strong>mechanics</strong> inspecting the engine. The LLM is the <strong>service manager</strong> at the front desk, translating their raw readouts into something you'd actually trust before driving off.</div>
+          </div>
+        </div>
+
+        <div class="panel fade-up">
+          <div class="ptitle">dashboard output <span class="live">�? example</span></div>
+          <div class="terminal" id="terminalOut"><span class="tprompt">&gt;</span> awaiting run<span class="caret"></span></div>
+          <button class="btn secondary" id="genRec" style="margin-top:14px;">Generate recommendation</button>
+        </div>
+      </div>
+
+      <div class="handoff"><span class="arrow">↳</span> End of pipeline — the recommendation is the only thing a human ever has to read.</div>
+    </div>
+  </section>
+
+  <!-- RECAP -->
+  <section class="recap">
+    <div class="wrap">
+      <div class="phase-head fade-up" style="margin-bottom:6px;">
+        <h2>The whole pipeline, in five metaphors</h2>
+      </div>
+      <p class="body-text fade-up">Strip away the tensors and this is what each stage is actually doing.</p>
+      <div class="recap-grid">
+        <div class="recap-card fade-up"><div class="rn">01</div><h4>The price guide</h4><p>An exact, independent answer for what every option should cost — the Blue Book.</p></div>
+        <div class="recap-card fade-up"><div class="rn">02</div><h4>The stakeout</h4><p>Photograph, security video, then the five seconds that matter — where the anomaly lives.</p></div>
+        <div class="recap-card fade-up"><div class="rn">03</div><h4>The zip file</h4><p>A 4K movie of raw market data, compressed small enough to hand to the next model.</p></div>
+        <div class="recap-card fade-up"><div class="rn">04</div><h4>The flight simulator</h4><p>10,000 synthetic hurricanes, thrown at the trade before any real capital boards.</p></div>
+        <div class="recap-card fade-up"><div class="rn">05</div><h4>The service desk</h4><p>Every mechanic's raw readout, translated into one paragraph you can actually act on.</p></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap fwrap">
+    <div class="fnote">Volatility Surface Arbitrage — architecture walkthrough</div>
+    <a href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;" class="fnote" style="text-decoration:none;color:var(--teal);">↑ back to top</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const svgNS = "http://www.w3.org/2000/svg";
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  /* ---------- hero mesh background ---------- */
+  (function heroMesh(){
+    const svg = document.getElementById('heroMesh');
+    const W = 1200, H = 520, cols = 22, rows = 10;
+    const amber = '#D8A63C', teal = '#4FB6AC';
+    let paths = [];
+    function surfaceY(x, row, t){
+      const base = 90 + row * ((H-160)/rows);
+      const smile = Math.pow((x - W/2)/ (W/2), 2) * 46;
+      const wave = Math.sin((x/W)*6 + row*0.5 + t) * 6;
+      return base - smile*0.4 + wave;
+    }
+    function build(t){
+      svg.innerHTML = '';
+      for (let r = 0; r <= rows; r++){
+        let d = '';
+        for (let c = 0; c <= cols; c++){
+          const x = (c/cols) * W;
+          const y = surfaceY(x, r, t);
+          d += (c === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+        }
+        const p = document.createElementNS(svgNS, 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('fill', 'none');
+        p.setAttribute('stroke', r % 3 === 0 ? teal : amber);
+        p.setAttribute('stroke-width', '1');
+        p.setAttribute('opacity', (0.06 + (r/rows)*0.12).toFixed(2));
+        svg.appendChild(p);
+      }
+      for (let c = 0; c <= cols; c += 2){
+        let d = '';
+        for (let r = 0; r <= rows; r++){
+          const x = (c/cols) * W;
+          const y = surfaceY(x, r, t);
+          d += (r === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+        }
+        const p = document.createElementNS(svgNS, 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('fill', 'none');
+        p.setAttribute('stroke', amber);
+        p.setAttribute('stroke-width', '1');
+        p.setAttribute('opacity', '0.07');
+        svg.appendChild(p);
+      }
+    }
+    let reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let t = 0;
+    build(0);
+    if (!reduced){
+      function tick(){ t += 0.004; build(t); requestAnimationFrame(tick); }
+      requestAnimationFrame(tick);
+    }
+  })();
+
+  /* ---------- scrollspy nav + pipeline strip ---------- */
+  const sections = ['p1','p2','p3','p4','p5'].map(id => document.getElementById(id));
+  const navA = Array.from(document.querySelectorAll('#navlinks a'));
+  const pnodes = Array.from(document.querySelectorAll('.pnode'));
+
+  function setActive(id){
+    navA.forEach(a => a.classList.toggle('active', a.dataset.target === id));
+    pnodes.forEach(n => n.classList.toggle('inview', n.dataset.target === id));
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) setActive(e.target.id); });
+  }, { rootMargin: '-40% 0px -55% 0px', threshold: 0 });
+  sections.forEach(s => s && io.observe(s));
+
+  pnodes.forEach(n => n.addEventListener('click', () => {
+    const el = document.getElementById(n.dataset.target);
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }));
+
+  /* ---------- fade-up on scroll ---------- */
+  const fio = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting){ e.target.classList.add('seen'); fio.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.fade-up').forEach(el => fio.observe(el));
+
+  /* ---------- versus tabs ---------- */
+  document.querySelectorAll('.versus').forEach(group => {
+    const buttons = group.querySelectorAll('.versus-tabs button');
+    const panels = group.querySelectorAll('.versus-panel');
+    buttons.forEach(btn => btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      panels.forEach(p => p.classList.toggle('show', p.classList.contains(btn.dataset.panel)));
+    }));
+  });
+
+  /* ---------- Phase 1: smile chart ---------- */
+  (function smileChart(){
+    const svg = document.getElementById('smileChart');
+    const W = 400, H = 220, pad = 30;
+    function pathFor(mode){
+      let d = '';
+      const n = 40;
+      for (let i = 0; i <= n; i++){
+        const x = pad + (i/n) * (W - pad*2);
+        const u = (i/n - 0.5) * 2;
+        const flatY = H/2;
+        const smileY = H/2 - (1 - u*u*0.15) * 0 - (Math.pow(u,2) * 55) + 8;
+        const y = mode === 'flat' ? flatY : smileY;
+        d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+      }
+      return d;
+    }
+    svg.innerHTML = `
+      <line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="var(--line-strong)" stroke-width="1"/>
+      <line x1="${pad}" y1="${pad-10}" x2="${pad}" y2="${H-pad}" stroke="var(--line-strong)" stroke-width="1"/>
+      <text x="${W/2}" y="${H-8}" fill="var(--text-faint)" font-size="10" font-family="var(--mono)" text-anchor="middle">strike</text>
+      <text x="12" y="${H/2}" fill="var(--text-faint)" font-size="10" font-family="var(--mono)" transform="rotate(-90 12 ${H/2})" text-anchor="middle">IV</text>
+      <path id="smilePath" d="${pathFor('flat')}" fill="none" stroke="var(--red)" stroke-width="2"/>
+    `;
+    const path = svg.querySelector('#smilePath');
+    document.querySelectorAll('[data-smile]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-smile]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.smile;
+        path.setAttribute('d', pathFor(mode));
+        path.setAttribute('stroke', mode === 'flat' ? cssVar('--red') : cssVar('--teal'));
+      });
+    });
+  })();
+
+  /* ---------- Phase 2: attention chart ---------- */
+  (function attnChart(){
+    const svg = document.getElementById('attnChart');
+    const weights = [0.06,0.09,0.05,0.12,0.07,0.08,0.80,0.10,0.06,0.11];
+    const maxW = Math.max(...weights);
+    const W = 400, H = 200, pad = 24, barW = (W - pad*2) / weights.length;
+    let bars = '';
+    weights.forEach((w, i) => {
+      const h = (w / maxW) * (H - pad*2 - 20);
+      const x = pad + i * barW + barW*0.18;
+      const y = H - pad - h;
+      const isMax = w === maxW;
+      bars += `<rect data-day="${i+1}" data-w="${w}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${(barW*0.64).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${isMax ? 'var(--amber)' : 'var(--teal)'}" opacity="${isMax ? 1 : 0.45}" style="cursor:pointer;transition:opacity .15s ease;"/>`;
+    });
+    svg.innerHTML = `<line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="var(--line-strong)" stroke-width="1"/>` + bars;
+    const readout = document.getElementById('attnReadout');
+    svg.querySelectorAll('rect').forEach(r => {
+      r.addEventListener('mouseenter', () => {
+        readout.textContent = `day ${r.dataset.day} → weight ${parseFloat(r.dataset.w).toFixed(2)}` + (parseFloat(r.dataset.w) === maxW ? ' → the session attention locked onto' : '');
+      });
+    });
+  })();
+
+  /* ---------- Phase 3: compression slider ---------- */
+  (function compressChart(){
+    const svg = document.getElementById('compressChart');
+    const slider = document.getElementById('compressSlider');
+    const label = document.getElementById('compressLabel');
+    const W = 400, H = 220, cx1 = 100, cy = 100, cx2 = 300;
+    const dots = [];
+    for (let i = 0; i < 60; i++){
+      const angle = (i / 60) * Math.PI * 2;
+      const r = 55 + (i % 5) * 6;
+      dots.push({ x: cx1 + Math.cos(angle)*r, y: cy + Math.sin(angle)*r*0.55 });
+    }
+    const targets = [ {x:cx2-14,y:cy-14}, {x:cx2+16,y:cy-4}, {x:cx2,y:cy+18} ];
+    function render(t){
+      let out = `<text x="${cx1}" y="${H-24}" fill="var(--text-faint)" font-size="10" font-family="var(--mono)" text-anchor="middle">raw surface</text>
+                  <text x="${cx2}" y="${H-24}" fill="var(--text-faint)" font-size="10" font-family="var(--mono)" text-anchor="middle">market-state latent</text>`;
+      dots.forEach((d, i) => {
+        const target = targets[i % 3];
+        const x = d.x + (target.x - d.x) * t;
+        const y = d.y + (target.y - d.y) * t;
+        const r = 3 - t*1.4;
+        out += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="var(--teal)" opacity="${(0.75 - t*0.15).toFixed(2)}"/>`;
+      });
+      if (t > 0.7){
+        const labels = ['0.9','0.1','0.5'];
+        targets.forEach((tg, i) => {
+          out += `<text x="${tg.x}" y="${tg.y - 12}" fill="var(--amber)" font-size="11" font-family="var(--mono)" text-anchor="middle" opacity="${((t-0.7)/0.3).toFixed(2)}">${labels[i]}</text>`;
+        });
+      }
+      svg.innerHTML = out;
+      label.textContent = Math.round(300 - t*297) + ' → ' + (t > 0.7 ? '3' : Math.round(300 - t*297));
+    }
+    slider.addEventListener('input', () => render(slider.value/100));
+    render(0);
+  })();
+
+  /* ---------- Phase 4: simulation ---------- */
+  (function sim(){
+    const svg = document.getElementById('simChart');
+    const btn = document.getElementById('runSim');
+    const status = document.getElementById('simStatus');
+    const W = 400, H = 190, pad = 20;
+    const n = 60;
+    let rejected = [];
+    for (let i = 0; i < n; i++) rejected.push(Math.random() < 0.15);
+    function render(progress){
+      let bars = '';
+      const shown = Math.floor(progress * n);
+      for (let i = 0; i < shown; i++){
+        const x = pad + i * ((W-pad*2)/n);
+        const isRej = rejected[i];
+        const h = isRej ? 30 + Math.random()*40 : 14 + Math.random()*10;
+        const y = H - pad - h;
+        bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${((W-pad*2)/n*0.6).toFixed(1)}" height="${h.toFixed(1)}" fill="${isRej ? 'var(--red)' : 'var(--teal)'}" opacity="${isRej ? 0.85 : 0.35}"/>`;
+      }
+      svg.innerHTML = `<line x1="${pad}" y1="${H-pad}" x2="${W-pad}" y2="${H-pad}" stroke="var(--line-strong)" stroke-width="1"/>` + bars;
+    }
+    render(1);
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      status.textContent = 'running…';
+      status.style.color = 'var(--amber)';
+      rejected = [];
+      for (let i = 0; i < n; i++) rejected.push(Math.random() < 0.15);
+      let p = 0;
+      const iv = setInterval(() => {
+        p += 0.05;
+        render(Math.min(p, 1));
+        if (p >= 1){
+          clearInterval(iv);
+          const survived = rejected.filter(r => !r).length;
+          const rate = Math.round((survived/n) * 10000);
+          status.textContent = `survived ${rate}/10,000`;
+          status.style.color = 'var(--green)';
+          btn.disabled = false;
+        }
+      }, 40);
+    });
+  })();
+
+  /* ---------- Phase 5: terminal ---------- */
+  (function terminal(){
+    const out = document.getElementById('terminalOut');
+    const btn = document.getElementById('genRec');
+    const text = "Anomaly at NIFTY 21500 flagged with 95% confidence by Module 1. Across 10,000 simulated futures, the position survived 8,500 — the deterministic rule compares this ratio and CVaR against the stated thresholds and returns EXECUTE. This is the rule's decision, not a recommendation of mine; every number above is drawn from the structured JSON it was given.";
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      out.innerHTML = '<span class="tprompt">&gt;</span> ';
+      let i = 0;
+      const iv = setInterval(() => {
+        out.innerHTML = '<span class="tprompt">&gt;</span> ' + text.slice(0, i) + '<span class="caret"></span>';
+        i += 3;
+        if (i > text.length){
+          clearInterval(iv);
+          out.innerHTML = '<span class="tprompt">&gt;</span> ' + text + '<span class="caret"></span>';
+          btn.disabled = false;
+        }
+      }, 18);
+    });
+  })();
+
+})();
+</script>
+</body>
+</html>
+

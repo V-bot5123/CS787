@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Ultimate Project Blueprint — Explainer</title>
+<style>
+:root{--bg:#0a0d12;--panel:#11151d;--line:#232a36;--amber:#d9a441;--teal:#4fd1c5;--red:#e2483d;--green:#5fbf77;--text:#dfe4ec;--dim:#8b93a3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f1ea;--panel:#fff;--line:#ddd6c8;--text:#20242c;--dim:#5b6270}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,"SF Mono",Consolas,monospace;min-height:100%}
+header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 18px;z-index:10}
+h1{font-size:1rem;margin:0}h1 span{color:var(--amber)}
+.sub{color:var(--dim);font-size:.75rem;margin-top:4px}
+nav{display:flex;gap:4px;margin-top:12px;overflow-x:auto}
+nav button{background:transparent;border:1px solid var(--line);color:var(--dim);padding:7px 11px;border-radius:6px;font:inherit;font-size:.74rem;cursor:pointer;white-space:nowrap}
+nav button.active{color:var(--bg);background:var(--amber);border-color:var(--amber);font-weight:700}
+main{max-width:920px;margin:0 auto;padding:20px 18px 60px}
+section{display:none}section.active{display:block;animation:f .25s}
+@keyframes f{from{opacity:0}to{opacity:1}}
+h2{color:var(--amber);font-size:1.1rem;margin:0 0 10px}
+p{font-size:.85rem;max-width:76ch}
+.timeline{display:flex;gap:0;overflow-x:auto;padding:14px 0;margin-bottom:6px}
+.dot{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--panel);border:2px solid var(--line);color:var(--dim);display:flex;align-items:center;justify-content:center;font-size:.72rem;cursor:pointer;margin-right:22px;position:relative}
+.dot.on{border-color:var(--teal);color:var(--teal);background:rgba(79,209,197,.1)}
+.dot::after{content:'';position:absolute;left:34px;top:50%;width:22px;height:2px;background:var(--line)}
+.dot:last-child::after{display:none}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;margin-top:8px;display:none}
+.step.show{display:block;animation:f .2s}
+.step h3{margin:0 0 8px;color:var(--teal);font-size:.95rem}
+.step p, .step li{font-size:.83rem}
+.warn{border-left:3px solid var(--red);padding-left:10px;display:block;margin-top:8px}
+.code{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:.76rem;color:var(--teal);margin-top:6px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:8px}
+th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-size:.68rem;text-transform:uppercase}
+.phasebar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.phasebar span{font-size:.68rem;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:3px 8px;color:var(--dim)}
+.phasebar span.on{color:var(--amber);border-color:var(--amber)}
+</style></head>
+<body>
+<header>
+  <h1>THE ULTIMATE PROJECT BLUEPRINT <span>// 17-step walkthrough</span></h1>
+  <div class="sub">The_Ultimate_Project_Blueprint_FINAL.md — full corrected pipeline, Phase 1→5</div>
+  <nav id="phasenav"></nav>
+</header>
+<main>
+  <div class="phasebar" id="phasebar"></div>
+  <div class="timeline" id="timeline"></div>
+  <div id="steps"></div>
+  <h2 style="margin-top:26px">Evaluation checklist (run for baseline + every extension)</h2>
+  <table><tbody>
+    <tr><td>1</td><td>Arbitrage penalty Π — mean/std/median, vs. market data, BCE-only GAN, raw VolGAN.</td></tr>
+    <tr><td>2</td><td>Smoothness — visual check against L_m, L_τ.</td></tr>
+    <tr><td>3</td><td>PCA structure — inner product of simulated vs. data eigenvectors (paper benchmark ~0.9 for level/skew).</td></tr>
+    <tr><td>4</td><td>Correlations &amp; tails — asymmetric heavy tails vs. Gaussian; leverage-effect correlation.</td></tr>
+    <tr><td>5</td><td>Quantile exceedance at 1/2.5/97.5/99% (Kupiec test) — the tail-realism check from Step 13.</td></tr>
+    <tr><td>6</td><td>Hedging — tracking error vs. Black-Scholes delta and delta-vega.</td></tr>
+    <tr><td>7</td><td>Module 1 detection — precision/recall vs. the z-score baseline.</td></tr>
+    <tr><td>8</td><td>Survival sensitivity — how the survival ratio moves with loss limit L, re-weighting β, and the latent c.</td></tr>
+  </tbody></table>
+  <p class="warn">Every fallback tier, if compute or data forces a cut, drops the Wasserstein-GP ablation and the VAE (use PCA) before dropping anything else — the paper-faithful VolGAN baseline, Module 1, and the survival test are the minimum coherent pipeline.</p>
+</main>
+<script>
+const steps = [
+{n:1,phase:1,title:"Data Ingestion",body:"Parse NSE Bhavcopy for NIFTY options: strike, expiry, market price, risk-free rate (implied from put-call parity). NIFTY has weekly expiries, so expect very short times-to-maturity (τ) in the grid — more numerically delicate than the SPX data VolGAN was built on; budget time for a bracketing-method fallback when vega is tiny."},
+{n:2,phase:1,title:"Per-expiry calibration + Carr-Madan FFT",body:"For each expiry, calibrate a Variance Gamma model by weighted least squares in IV (weights ∝ vega). Price the whole strike grid with Carr-Madan FFT: C(K,T) = FFT[ φ(u)·e^(−iu·ln K) ].",warn:"This gives prices, not volatilities — it is not the final output of this step."},
+{n:3,phase:1,title:"Black-Scholes inversion",body:"Invert every FFT price back to a model implied volatility cell-by-cell via Newton's method on Black-Scholes, with a bracketing-solver fallback when vega is near zero (deep OTM, very short τ):",code:"σ_(n+1) = σ_n − (C_BS(σ_n) − C_VG) / vega",warn:"Never subtract an FFT price surface directly from a market IV surface — the residual would carry vega-scaled noise (huge near ATM, invisible in the wings) rather than a meaningful mispricing. This is the step the OLD blueprint skipped."},
+{n:4,phase:1,title:"The Residual Matrix",body:"Residual = Market IV − Model IV, computed with a leave-out fit (recalibrate without a small neighbourhood around the cell being scored, so the fit can't absorb the anomaly it's supposed to find). Flag a cell only if the residual exceeds half the bid-ask width in IV plus a cost buffer (or, with no bid-ask data, a volume/open-interest threshold)."},
+{n:5,phase:2,title:"Grid &amp; CNN spatial gradients",body:"Grid in forward moneyness m=K/F and time-to-maturity τ, with a mask channel for missing quotes. A fully convolutional CNN encodes each day's residual matrix into a per-cell feature map — this produces the promised heatmap directly (argmax is the coordinate, the max value is the confidence), rather than only a scalar + coordinate bolted on after the fact."},
+{n:6,phase:2,title:"LSTM temporal memory",body:"Feed a sequence of L daily residual matrices (10–20 days) — the LSTM needs a sequence, not a single matrix — and let it aggregate across days."},
+{n:7,phase:2,title:"Softmax attention",body:"Weights the L days; pools into the final per-cell score map."},
+{n:8,phase:2,title:"Labels &amp; baseline",body:"Ground-truth labels come from synthetic bump injection (known-truth anomalies added to clean historical residuals) and/or a reversion criterion (cell is anomalous if its residual shrinks ≥x% within h days) — never from the residual threshold itself, which would be circular. Split chronologically, never randomly. A rolling z-score is the baseline this whole CNN-LSTM-Attention stack has to beat; report precision/recall for both.",warn:"Output: a mispricing signal and coordinate — called that, not \"arbitrage,\" since it's relative value against Module 1's own model, not a riskless violation."},
+{n:9,phase:3,title:"Variational Autoencoder",body:"Input: the smoothed volatility surface (Nadaraya-Watson kernel smoothing, bandwidths chosen to minimize the arbitrage penalty on a sample day) — deliberately a different, smoothed data track from Module 1's raw residuals, since smoothing would erase the very anomalies Module 1 looks for. Small latent size (d ≈ 3–8), with KL warm-up or a β-VAE to avoid posterior collapse (where the latent silently carries no information and the pipeline becomes unconditional without anyone noticing)."},
+{n:10,phase:3,title:"PCA baseline (not a straw man)",body:"The base paper's own PCA already explains ~90% of variance with the first 3 components (51.25% + 34.00% + 5.01%, per VolGAN Table 4). The VAE is tested against a PCA baseline of the same latent size d — on reconstruction error, and more importantly on downstream survival ratio and hedging error — and is only claimed as an improvement if it actually wins. Call the output a \"market-state latent,\" not a \"macroeconomic regime\" — validate against something observable (does it separate known stress episodes like March 2020? correlate with India VIX?) before calling it a regime."},
+{n:11,phase:4,title:"Paper-faithful baseline (train this first)",body:"Implement VolGAN as published, not as reimagined: generator outputs the joint pair (R̂_t, Δĝ_t) — return and log-IV increment together, because this joint structure reproduces the empirical leverage effect (paper: correlation −0.76 in data, −0.84 in VolGAN). Loss = BCE + Sobolev smoothness penalties L_m, L_τ, weights α_m, α_τ chosen by gradient-norm matching over a 25-epoch pilot run. Arbitrage is NOT in this baseline's loss — corrected afterward by re-weighting scenarios w_i ∝ exp(−β·Π_i).",code:"Generator: 3-layer (H=16, 2H=32, noise dim 32, softplus/affine)\\nDiscriminator: 2-layer (H=16, 1, softplus/sigmoid)\\nRMSProp, lr 0.0001, batch 100, 10,000 epochs, alternating updates"},
+{n:12,phase:4,title:"Our extensions (ablated, not replacing)",body:"1. Full arbitrage penalty in the loss: Π = p1+p2+p3 — calendar, monotonicity, AND butterfly violations (not calendar alone), computed via finite differences on relative call prices, added directly to the generator loss.<br>2. Wasserstein-GP objective as a separate ablation against the BCE baseline — changes the discriminator's meaning (an unbounded critic instead of a probability) and the gradient scale, so α-matching is redone; compared to, not substituted for, Step 11.",warn:"Neither version is guaranteed arbitrage-free. Report mean/std/median of Π for market data, BCE-only GAN (expect badly jagged — paper reports Π ≈ 2.46 vs market's 0.0096), raw VolGAN, and each extension."},
+{n:13,phase:4,title:"Tail-realism check (the part most demos skip)",body:"Run a Kupiec proportion-of-failures test on the 1%, 2.5%, 97.5%, 99% quantiles.",warn:"The paper's own numbers show its tails are too thin — 25.32% of realized SPX returns fell below the simulated 1% quantile when it should be ~1%. A \"trade survived 8,500/10,000 crashes\" claim is misleading if the simulated crashes are milder than real ones — check this on your own NIFTY data before trusting any survival ratio, and disclose the result either way."},
+{n:14,phase:5,title:"Reprice, hedge, and define \"survive\"",body:"For each of the 10,000 scenarios: new spot S_j = S_t·exp(R̂_j), new surface σ_j = exp(g_t + Δĝ_j). Reprice the flagged trade, hedge by regression against a candidate instrument set (LASSO-selected), and compute hedged PnL.",warn:"A scenario survives if PnL_j ≥ −L for a stated loss limit L — this must be defined explicitly; \"survived\" with no definition is not a testable claim. Report survival ratio, 5% VaR, and CVaR."},
+{n:15,phase:5,title:"Deterministic decision rule",body:"EXECUTE or ABORT is decided by a hard-coded, deterministic rule on survival ratio and CVaR — never by the LLM.",warn:"This is the single highest-stakes fix in the whole project: an LLM that decides trades from one scalar is neither reproducible nor auditable."},
+{n:16,phase:5,title:"LLM explanation only",body:"A LangGraph multi-agent LLM receives the deterministic decision plus structured JSON (PnL quantiles, worst scenario, Π statistics, effective sample size, Module 1's score/coordinate) and produces a plain-English explanation of THAT decision — every number it quotes is checked against the input JSON before being shown to the trader."},
+{n:17,phase:5,title:"Streamlit Dashboard",body:"Shows: the CNN-LSTM-Attention heatmap; the GAN's synthetic stress-test surfaces AND their arbitrage-penalty distribution (not just the survival ratio in isolation); the LLM's explanation of the rule's EXECUTE/ABORT output, never the LLM's own recommendation."}
+];
+const phases = {1:"Data & Ground Truth",2:"Discriminative Detection",3:"Dimensionality Reduction",4:"Generative Stress-Testing",5:"Explainability & Execution"};
+
+const timeline = document.getElementById('timeline');
+steps.forEach(s=>{
+  const d=document.createElement('div'); d.className='dot'; d.textContent=s.n; d.id='dot'+s.n;
+  d.onclick=()=>go(s.n); timeline.appendChild(d);
+});
+const stepsEl = document.getElementById('steps');
+steps.forEach(s=>{
+  const div=document.createElement('div'); div.className='step'; div.id='step'+s.n;
+  div.innerHTML = `<h3>Step ${s.n} — ${s.title}</h3><p>${s.body}</p>${s.code?`<div class="code">${s.code}</div>`:''}${s.warn?`<span class="warn">${s.warn}</span>`:''}`;
+  stepsEl.appendChild(div);
+});
+const phasebar = document.getElementById('phasebar');
+Object.entries(phases).forEach(([k,v])=>{ const s=document.createElement('span'); s.id='ph'+k; s.textContent=`Phase ${k}: ${v}`; phasebar.appendChild(s); });
+
+function go(n){
+  document.querySelectorAll('.dot').forEach(d=>d.classList.remove('on'));
+  document.querySelectorAll('.step').forEach(d=>d.classList.remove('show'));
+  document.querySelectorAll('.phasebar span').forEach(d=>d.classList.remove('on'));
+  document.getElementById('dot'+n).classList.add('on');
+  document.getElementById('step'+n).classList.add('show');
+  const ph = steps.find(s=>s.n===n).phase;
+  document.getElementById('ph'+ph).classList.add('on');
+}
+go(1);
+</script>
+</body></html>

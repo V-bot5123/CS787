@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frontend↔Backend Integration — Explainer</title>
+<style>
+:root{--bg:#0a0d12;--panel:#11151d;--line:#232a36;--amber:#d9a441;--teal:#4fd1c5;--red:#e2483d;--text:#dfe4ec;--dim:#8b93a3;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f1ea;--panel:#fff;--line:#ddd6c8;--text:#20242c;--dim:#5b6270}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:ui-monospace,"SF Mono",Consolas,monospace;min-height:100%}
+header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:14px 18px;z-index:10}
+h1{font-size:1rem;margin:0}h1 span{color:var(--amber)}
+.sub{color:var(--dim);font-size:.75rem;margin-top:4px}
+main{max-width:920px;margin:0 auto;padding:20px 18px 60px}
+h2{color:var(--amber);font-size:1.1rem;margin:24px 0 8px}
+p{font-size:.85rem;max-width:76ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin:10px 0}
+.diagram{overflow-x:auto}svg{display:block;min-width:640px}
+.node rect{fill:var(--panel);stroke:var(--line);stroke-width:1.5;cursor:pointer}
+.node text{fill:var(--text);font-size:10px}
+.node .lbl{fill:var(--teal);font-weight:700;font-size:10px}
+.flow{stroke:var(--dim);stroke-width:1.3;fill:none;marker-end:url(#a)}
+.pulse{fill:var(--amber)}
+.pt{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;cursor:pointer}
+.pt.open{border-color:var(--teal)}
+.pt h3{margin:0;font-size:.88rem;color:var(--text)}
+.pt small{color:var(--dim);display:block;margin-top:3px;font-size:.72rem}
+.pt .body{display:none;margin-top:10px;font-size:.8rem}
+.pt.open .body{display:block}
+.pt .json{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:6px;padding:8px;margin-top:8px;font-size:.74rem;color:var(--teal);white-space:pre-wrap}
+.note{border-left:3px solid var(--red);padding-left:10px;margin-top:8px}
+.badge{display:inline-block;background:rgba(79,209,197,.12);color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:1px 7px;font-size:.68rem;margin-right:6px}
+</style></head>
+<body>
+<header>
+  <h1>FRONTEND ↔ BACKEND <span>// integration matrix</span></h1>
+  <div class="sub">Frontend_Backend_Integration_Architecture_CORRECTED_v3.md — 8 wiring points, deck + mockup</div>
+</header>
+<main>
+  <h2>What changed (v2 → CORRECTED v3)</h2>
+  <p>Content was already correct in v2 — endpoint names, residual description, LLM-explains-only framing. The <b>only</b> fix: Module 3's label still read "Custom Arbitrage-Free GAN, VolGAN-inspired" (self-contradicting). Renamed to <b>"Arbitrage-Penalized VolGAN Extension"</b> everywhere.</p>
+
+  <h2>The bridge architecture</h2>
+  <p>Async RESTful API (FastAPI/Flask). Backend loads PyTorch tensors and runs the heavy compute. Python exposes endpoints like <code>POST /api/run_generative_stress_test</code>. Frontend HTML uses <code>fetch()</code> to call them asynchronously; backend replies with strict JSON, updating the DOM without a page refresh — keeps the UI responsive while the GAN generates 10,000 surfaces in the background.</p>
+  <div class="card diagram">
+    <svg viewBox="0 0 700 130">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--dim)"/></marker></defs>
+      <path class="flow" d="M120,65 H290"/><path class="flow" d="M410,65 H580"/>
+      <g class="node"><rect x="20" y="35" width="100" height="60" rx="6"/><text x="70" y="60" text-anchor="middle" class="lbl">STATIC HTML</text><text x="70" y="75" text-anchor="middle">fetch()</text></g>
+      <g class="node"><rect x="290" y="35" width="120" height="60" rx="6"/><text x="350" y="55" text-anchor="middle" class="lbl">FastAPI/Flask</text><text x="350" y="70" text-anchor="middle">REST JSON</text><text x="350" y="84" text-anchor="middle">endpoints</text></g>
+      <g class="node"><rect x="580" y="35" width="100" height="60" rx="6"/><text x="630" y="55" text-anchor="middle" class="lbl">PYTORCH</text><text x="630" y="70" text-anchor="middle">GAN, CNN,</text><text x="630" y="84" text-anchor="middle">VAE .pt</text></g>
+      <circle r="4" class="pulse"><animateMotion dur="2.2s" repeatCount="indefinite" path="M120,65 H580"/></circle>
+    </svg>
+  </div>
+
+  <h2>Part 1 — Architecture Deck (volatility-surface-arbitrage.html)</h2>
+  <div id="p1"></div>
+  <h2>Part 2 — Trader's Dashboard (streamlit_demo_mockup.html)</h2>
+  <div id="p2"></div>
+</main>
+<script>
+const part1 = [
+["1","The \"Flat vs. Smile\" Chart (Phase 1)","Backend: Step 2 (Carr-Madan FFT) — 1_Data_and_FFT.ipynb",
+ "HTML sends a GET request. Python computes the numerical integration over the characteristic function, returns an array of theoretical price coordinates. This is the raw FFT price stage ONLY — the Black-Scholes inversion to model IV happens downstream, before Module 1 ever compares it to market IV.",
+ '{"curve_type": "carr_madan", "coordinates": [[21000, 18.5], [21500, 12.2], ...]}'],
+["2","The \"Attention Weights\" Bar Chart (Phase 2)","Backend: Step 6 (Attention Mechanism) — 2_Anomaly_Detection.ipynb",
+ "Python extracts the Softmax weights from the LSTM's hidden state over the 10-day lookback window. Frontend JS parses this array to set the height CSS properties of the SVG bars.<br><br><i>Implementation note: softmax weights must sum to 1 — verify this before wiring the array to the frontend; the sample below is illustrative only.</i>",
+ '{"day_weights": [0.06, 0.09, 0.05, 0.12, 0.07, 0.08, 0.80, 0.10, 0.06, 0.11]}'],
+["3","The \"Simulation Run\" Chart (Phase 4)","Backend: Step 11/12 (Arbitrage-Penalized VolGAN Extension) — 3_Generative_Models.ipynb",
+ "Clicking the button sends an async POST /api/run_generative_stress_test. Python runs the GAN generator (paper-faithful baseline + extensions) conditioned on the VAE's latent vector c, reprices/hedges the flagged trade across all 10,000 scenarios, and applies the deterministic EXECUTE/ABORT rule — a hard-coded threshold on survival ratio and CVaR, computed entirely in Python, before anything reaches the LLM.<br><br>Field is <code>survival_ratio</code> with an explicit <code>decision</code> field, NOT a vague <code>confidence_score</code> — \"confidence\" implied a GAN-native probability; survival ratio is what the paper-faithful pipeline actually computes.",
+ '{"status": "success", "simulations_run": 10000, "survivals": 8500,\\n "survival_ratio": 0.85, "cvar_5pct": -4200, "decision": "EXECUTE"}'],
+["4","The Terminal Output Window (Phase 5)","Backend: Step 16 (LLM Generation) — 4_LLM_Agents.ipynb",
+ "Python passes the deterministic decision plus the quantitative data to the LangGraph orchestrator. The API uses Server-Sent Events (SSE) to stream the LLM's <b>explanation</b> — not its decision — back to the frontend, creating the \"typing\" effect on the HTML page.", ""]
+];
+const part2 = [
+["5","Pipeline Controls (Sidebar Inputs)","Backend: Step 1 (Data Ingestion) — 1_Data_and_FFT.ipynb",
+ "User selects a date (e.g. 2026-09-21) and clicks \"Run.\" Frontend sends a POST request. Python executes the <code>jugaad-data</code> library to scrape the exact historical NSE Bhavcopy for that date, initializing the pipeline. <b>This is end-of-day data, not a real-time feed.</b>",
+ '{"asset": "NIFTY 50", "target_date": "2026-09-21"}'],
+["6","The 2D Volatility Surface Heatmap","Backend: Steps 5–7 (CNN Spatial Gradients) — 2_Anomaly_Detection.ipynb",
+ "Python calculates the Residual Matrix as Market IV − Model IV, where Model IV comes from inverting the Carr-Madan FFT price grid cell-by-cell via Newton's method on Black-Scholes (bracketing-solver fallback near-zero vega) — <b>never a raw price-vs-IV subtraction</b>, which would carry vega-scaled noise instead of a meaningful signal. Runs the CNN-LSTM-Attention stack to find the highest-confidence anomaly and returns the exact (x,y) grid coordinates to the frontend, which applies a CSS pulsing animation to that cell.",
+ '{"matrix_size": [10, 10], "anomaly_detected": true,\\n "anomaly_coords": [4, 7], "contract": "NIFTY 25000 CE"}'],
+["7","LangGraph Agent Analysis Terminal","Backend: Steps 15–16 (Multi-Agent Reasoning) — 4_LLM_Agents.ipynb",
+ "Python's deterministic rule — not the LLM — computes the EXECUTE/ABORT decision from the survival ratio and CVaR. The LangGraph agent receives that already-made decision plus structured JSON and generates only the plain-English explanation, injected into the terminal div. The LLM never chooses BUY/SELL on its own, and every number in its explanation is checked against the input JSON before display.",
+ '{"agent_status": "complete", "decision": "EXECUTE",\\n "action_hint": "BUY to open (per deterministic rule)",\\n "reasoning_text": "NIFTY 25000 CE is currently trading..."}'],
+["8","Raw Detection Log (Master Data Table)","Backend: The Aggregation Layer — 5_Dashboard.ipynb",
+ "Python compiles the outputs of Module 1 (market price, model fair value), Module 3/4 (survival ratio, decision), and the LLM (explanation text) into one JSON array. The frontend iterates through it and generates the HTML table rows dynamically. <span class=\"note\">A row's Action must be consistent with its survival ratio against the EXECUTE threshold (e.g. ≥85%) — a row below threshold should read ABORT, not BUY or SELL.</span>", ""]
+];
+function render(list, elId){
+  const el = document.getElementById(elId);
+  list.forEach(([n,title,backend,body,json])=>{
+    const div = document.createElement('div'); div.className='pt';
+    div.innerHTML = `<h3><span class="badge">${n}</span>${title}</h3><small>${backend}</small>
+      <div class="body"><p>${body}</p>${json?`<div class="json">${json}</div>`:''}</div>`;
+    div.onclick = ()=>div.classList.toggle('open');
+    el.appendChild(div);
+  });
+}
+render(part1,'p1'); render(part2,'p2');
+document.querySelectorAll('.pt')[0].classList.add('open');
+</script>
+</body></html>

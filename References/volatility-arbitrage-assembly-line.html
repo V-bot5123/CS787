@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Volatility Surface Arbitrage — The Assembly Line</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    color-scheme: light;
+    --bg: #F1EFE6;
+    --bg-elevated: #FFFFFF;
+    --bg-sunken: #E8E4D7;
+    --border: #D6D0BE;
+    --text: #1B1C1E;
+    --text-muted: #656B5E;
+    --accent: #A9660B;
+    --accent-ink: #FFFFFF;
+    --accent-2: #14766D;
+    --danger: #A13B2B;
+    --shadow: rgba(30, 27, 18, 0.08);
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #10141B;
+      --bg-elevated: #171D27;
+      --bg-sunken: #0B0E13;
+      --border: #2A3344;
+      --text: #E7E4DC;
+      --text-muted: #8B93A3;
+      --accent: #E8A23D;
+      --accent-ink: #171208;
+      --accent-2: #4FB8AE;
+      --danger: #E0836D;
+      --shadow: rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #10141B;
+    --bg-elevated: #171D27;
+    --bg-sunken: #0B0E13;
+    --border: #2A3344;
+    --text: #E7E4DC;
+    --text-muted: #8B93A3;
+    --accent: #E8A23D;
+    --accent-ink: #171208;
+    --accent-2: #4FB8AE;
+    --danger: #E0836D;
+    --shadow: rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+  }
+  html { scroll-padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+
+  body {
+    font-family: var(--font-mono);
+    color: var(--text);
+    line-height: 1.55;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+
+  a { color: var(--accent-2); }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding-top: env(safe-area-inset-top, 0px);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .topbar-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+  .topbar-title strong { color: var(--text); }
+  .play-btn {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 3px;
+    padding: 8px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .play-btn:hover { filter: brightness(1.06); }
+  .play-btn:active { filter: brightness(0.95); }
+  .play-btn:focus-visible, button:focus-visible, summary:focus-visible, .node:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Header ---------- */
+  header.hero { padding: 56px 0 28px; }
+  .eyebrow-line {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  h1.title {
+    font-size: clamp(34px, 6vw, 52px);
+    line-height: 1.04;
+    max-width: 12ch;
+  }
+  .title em { font-style: italic; color: var(--accent); }
+  .dek {
+    margin-top: 18px;
+    max-width: 62ch;
+    font-size: 16px;
+    color: var(--text-muted);
+  }
+
+  /* ---------- Pipeline ---------- */
+  .pipeline-section { padding: 8px 0 44px; }
+  .pipeline-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+  @media (max-width: 700px) {
+    .pipeline { flex-direction: column; }
+  }
+
+  .node {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 0;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .node.is-endpoint { cursor: default; background: var(--bg-sunken); }
+  .node .num { font-size: 11px; color: var(--text-muted); }
+  .node .label { font-size: 12px; font-weight: 600; line-height: 1.25; }
+  .node .sub { font-size: 10px; color: var(--text-muted); }
+  .node:hover:not(.is-endpoint) { border-color: var(--accent-2); }
+  .node.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .connector {
+    flex: 0 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .connector .track {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    position: relative;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .connector .fill {
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.55s ease;
+  }
+  @media (max-width: 700px) {
+    .connector { flex: 0 0 22px; }
+    .connector .track { width: 3px; height: 100%; margin: 0 auto; }
+    .connector .fill { width: 100%; height: 0%; }
+  }
+
+  .caption-panel {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    min-height: 52px;
+    color: var(--text);
+  }
+  .caption-panel .step-tag {
+    display: block;
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- Cards ---------- */
+  .cards-section { padding: 20px 0 40px; }
+  .section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .section-heading h2 { font-size: 22px; }
+  .toggle-all {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .toggle-all:hover { border-color: var(--accent-2); color: var(--text); }
+
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-elevated);
+    margin-bottom: 10px;
+    scroll-margin-top: 78px;
+  }
+  .card-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+  }
+  .card-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-head-text { flex: 1; min-width: 0; }
+  .card-role { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .card-paper { font-family: var(--font-display); font-size: 18px; font-weight: 500; }
+  .card-chevron {
+    font-size: 14px;
+    color: var(--text-muted);
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+  }
+  .card.open .card-chevron { transform: rotate(180deg); }
+
+  .card-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s ease;
+  }
+  .card.open .card-body { grid-template-rows: 1fr; }
+  .card-body-inner { overflow: hidden; }
+  .card-content { padding: 0 18px 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+
+  .field { margin-bottom: 14px; }
+  .field-label {
+    font-size: 11px;
+    color: var(--accent-2);
+    margin-bottom: 4px;
+  }
+  .field-body { font-size: 14px; color: var(--text); }
+
+  .io-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 520px) { .io-row { grid-template-columns: 1fr; } }
+  .io-box {
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 12px;
+  }
+  .io-box .field-label { margin-bottom: 6px; }
+  .io-box .field-body { font-size: 13px; }
+
+  blockquote.takeaway {
+    margin: 14px 0 0;
+    padding: 12px 14px;
+    border-left: 3px solid var(--accent);
+    background: var(--bg-sunken);
+    border-radius: 0 3px 3px 0;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--text);
+  }
+  blockquote.takeaway .attr {
+    display: block;
+    margin-top: 6px;
+    font-style: normal;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ---------- Assembly narrative ---------- */
+  .assembly-section { padding: 12px 0 60px; }
+  .assembly-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: step;
+  }
+  .assembly-list li {
+    counter-increment: step;
+    display: flex;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .assembly-list li:last-child { border-bottom: none; }
+  .assembly-list li::before {
+    content: counter(step);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .assembly-list .step-title { font-family: var(--font-display); font-size: 16px; margin-bottom: 3px; }
+  .assembly-list .step-body { font-size: 14px; color: var(--text-muted); }
+
+  .final-line {
+    margin-top: 20px;
+    padding: 14px 16px;
+    background: var(--bg-sunken);
+    border: 1px dashed var(--border);
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  .final-line .prompt { color: var(--accent-2); }
+  .final-line .out { color: var(--text); }
+
+  footer {
+    padding: 26px 0 40px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="topbar-title">📈 <strong>Vol Surface</strong> · study sheets</span>
+    <button class="play-btn" id="playBtn" type="button">▶ Play the assembly line</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow-line">Six papers · one pipeline · defended in front of a professor</div>
+    <h1 class="title">The assembly line behind <em>volatility surface arbitrage</em></h1>
+    <p class="dek">Five papers do five different jobs. None of them is the project on its own — the project is the order they run in. Click a stage below to jump to it, or press play to watch data move end to end.</p>
+  </header>
+
+  <section class="pipeline-section" aria-label="Data flow diagram">
+    <div class="pipeline-label">DATA FLOW — click a stage, or press play</div>
+    <div class="pipeline" id="pipeline">
+      <div class="node is-endpoint" data-node="0" tabindex="-1">
+        <span class="num">IN</span>
+        <span class="label">Raw options data</span>
+        <span class="sub">strikes × expiries</span>
+      </div>
+      <div class="connector"><div class="track"><div class="fill" data-fill="0"></div></div></div>
+
+      <div class="node" data-node="1" data-card="card-1" role="button" tabindex="0" aria-label="Jump to Sheet 1, Carr-Madan">
+        <span class="num">01</span>
+        <span class="label">Carr–Madan FFT</span>
+        <span class="sub">ground truth</span>
+      </div>
+      <div class="connector"><div class="track"><div class="fill" data-fill="1"></div></div></div>
+
+      <div class="node" data-node="2" data-card="card-2" role="button" tabindex="0" aria-label="Jump to Sheet 2, CNN">
+        <span class="num">02</span>
+        <span class="label">CNN detector</span>
+        <span class="sub">anomaly coords</span>
+      </div>
+      <div class="connector"><div class="track"><div class="fill" data-fill="2"></div></div></div>
+
+      <div class="node" data-node="3" data-card="card-3" role="button" tabindex="0" aria-label="Jump to Sheet 3, VAE">
+        <span class="num">03</span>
+        <span class="label">VAE compressor</span>
+        <span class="sub">regime vector</span>
+      </div>
+      <div class="connector"><div class="track"><div class="fill" data-fill="3"></div></div></div>
+
+      <div class="node" data-node="4" data-card="card-4" role="button" tabindex="0" aria-label="Jump to Sheet 4, VolGAN">
+        <span class="num">04</span>
+        <span class="label">VolGAN</span>
+        <span class="sub">10,000 futures</span>
+      </div>
+      <div class="connector"><div class="track"><div class="fill" data-fill="4"></div></div></div>
+
+      <div class="node" data-node="5" data-card="card-5" role="button" tabindex="0" aria-label="Jump to Sheet 5, FinRobot">
+        <span class="num">05</span>
+        <span class="label">FinRobot LLM</span>
+        <span class="sub">plain-English case</span>
+      </div>
+      <div class="connector"><div class="track"><div class="fill" data-fill="5"></div></div></div>
+
+      <div class="node is-endpoint" data-node="6" tabindex="-1">
+        <span class="num">OUT</span>
+        <span class="label">Trade decision</span>
+        <span class="sub">execute / hold</span>
+      </div>
+    </div>
+
+    <div class="caption-panel" id="captionPanel" aria-live="polite">
+      <span class="step-tag">READY</span>
+      Press play to walk through Sheet 6's data flow, one stage at a time — or click any numbered stage to read its full study sheet below.
+    </div>
+  </section>
+
+  <section class="cards-section">
+    <div class="section-heading">
+      <h2>The five sheets</h2>
+      <button class="toggle-all" id="toggleAll" type="button">Expand all</button>
+    </div>
+
+    <!-- CARD 1 -->
+    <div class="card open" id="card-1">
+      <button class="card-head" aria-expanded="true">
+        <span class="card-num">1</span>
+        <span class="card-head-text">
+          <span class="card-role">The math engine</span>
+          <span class="card-paper">Option Valuation Using the Fast Fourier Transform — Carr &amp; Madan (1999)</span>
+        </span>
+        <span class="card-chevron">▾</span>
+      </button>
+      <div class="card-body"><div class="card-body-inner"><div class="card-content">
+        <div class="field">
+          <div class="field-label">THE PROBLEM</div>
+          <div class="field-body">Traditional pricing models like Black-Scholes are too slow and inflexible when you need prices for hundreds of option contracts at once.</div>
+        </div>
+        <div class="field">
+          <div class="field-label">THE SOLUTION</div>
+          <div class="field-body">Borrow the Fast Fourier Transform from signal processing to compute a whole grid of theoretical option prices in one pass, instead of one contract at a time.</div>
+        </div>
+        <div class="io-row">
+          <div class="io-box">
+            <div class="field-label">IN</div>
+            <div class="field-body">Spot price, risk-free rate, time to maturity, a characteristic function</div>
+          </div>
+          <div class="io-box">
+            <div class="field-label">OUT</div>
+            <div class="field-body">A grid of theoretically "perfect" option prices</div>
+          </div>
+        </div>
+        <blockquote class="takeaway">
+          I use Carr–Madan's FFT to establish an algorithmic, mathematically perfect ground-truth baseline before any machine learning touches the data.
+          <span class="attr">— the one-sentence answer, if asked</span>
+        </blockquote>
+      </div></div></div>
+    </div>
+
+    <!-- CARD 2 -->
+    <div class="card" id="card-2">
+      <button class="card-head" aria-expanded="false">
+        <span class="card-num">2</span>
+        <span class="card-head-text">
+          <span class="card-role">The anomaly detector</span>
+          <span class="card-paper">Deep Smoothing of the Implied Volatility Surface — Ackerer et al. (NeurIPS 2020)</span>
+        </span>
+        <span class="card-chevron">▾</span>
+      </button>
+      <div class="card-body"><div class="card-body-inner"><div class="card-content">
+        <div class="field">
+          <div class="field-label">THE PROBLEM</div>
+          <div class="field-body">Real market data is messy, sparse, and noisy — wide bid-ask spreads confuse traditional statistical methods.</div>
+        </div>
+        <div class="field">
+          <div class="field-label">THE SOLUTION</div>
+          <div class="field-body">Treat the volatility surface as a 2D image and run it through a convolutional neural network, so the model can smooth noise and pick out spatial anomalies the way it would spot a flaw in a picture.</div>
+        </div>
+        <div class="io-row">
+          <div class="io-box">
+            <div class="field-label">IN</div>
+            <div class="field-body">The noisy, real-world volatility grid (strike vs. expiry)</div>
+          </div>
+          <div class="io-box">
+            <div class="field-label">OUT</div>
+            <div class="field-body">A smoothed surface, plus the exact coordinates where mispricings sit</div>
+          </div>
+        </div>
+        <blockquote class="takeaway">
+          Instead of standard time-series analysis, this paper taught me to treat the volatility surface as a 2D image, using spatial pattern recognition to detect pricing anomalies.
+          <span class="attr">— the one-sentence answer, if asked</span>
+        </blockquote>
+      </div></div></div>
+    </div>
+
+    <!-- CARD 3 -->
+    <div class="card" id="card-3">
+      <button class="card-head" aria-expanded="false">
+        <span class="card-num">3</span>
+        <span class="card-head-text">
+          <span class="card-role">The compressor</span>
+          <span class="card-paper">Variational Autoencoders: A Hands-Off Approach to Volatility — Hull et al. (2022)</span>
+        </span>
+        <span class="card-chevron">▾</span>
+      </button>
+      <div class="card-body"><div class="card-body-inner"><div class="card-content">
+        <div class="field">
+          <div class="field-label">THE PROBLEM</div>
+          <div class="field-body">A full volatility surface is hundreds of data points. Feed that raw into a generative model and it's expensive to train and prone to breaking.</div>
+        </div>
+        <div class="field">
+          <div class="field-label">THE SOLUTION</div>
+          <div class="field-body">A variational autoencoder squashes the whole 3D surface down into a small, dense "latent vector" — a compact summary of the market's current mood.</div>
+        </div>
+        <div class="io-row">
+          <div class="io-box">
+            <div class="field-label">IN</div>
+            <div class="field-body">The massive, raw 3D volatility surface</div>
+          </div>
+          <div class="io-box">
+            <div class="field-label">OUT</div>
+            <div class="field-body">A compressed 1D vector representing the current "market regime" (e.g. high fear, low fear)</div>
+          </div>
+        </div>
+        <blockquote class="takeaway">
+          I use Hull's VAE for dimensionality reduction — it compresses the massive data grid into a lightweight "market regime" vector so the generative model downstream can run efficiently.
+          <span class="attr">— the one-sentence answer, if asked</span>
+        </blockquote>
+      </div></div></div>
+    </div>
+
+    <!-- CARD 4 -->
+    <div class="card" id="card-4">
+      <button class="card-head" aria-expanded="false">
+        <span class="card-num">4</span>
+        <span class="card-head-text">
+          <span class="card-role">The base paper — generative engine</span>
+          <span class="card-paper">VolGAN: A Generative Model for Arbitrage-Free Implied Volatility Surfaces — Vuletić &amp; Cont (2025)</span>
+        </span>
+        <span class="card-chevron">▾</span>
+      </button>
+      <div class="card-body"><div class="card-body-inner"><div class="card-content">
+        <div class="field">
+          <div class="field-label">THE PROBLEM</div>
+          <div class="field-body">Ordinary GANs are great at faces, terrible at finance — left unconstrained, a generator will invent prices that allow arbitrage, i.e. impossible free money.</div>
+        </div>
+        <div class="field">
+          <div class="field-label">THE SOLUTION</div>
+          <div class="field-body">A conditional GAN with a custom penalty: any generated market scenario that permits arbitrage gets punished during training, so the network learns to only output physically valid markets.</div>
+        </div>
+        <div class="io-row">
+          <div class="io-box">
+            <div class="field-label">IN</div>
+            <div class="field-body">Random noise + the compressed market-regime vector from Sheet 3</div>
+          </div>
+          <div class="io-box">
+            <div class="field-label">OUT</div>
+            <div class="field-body">10,000 synthetic, fake-but-realistic future volatility surfaces that obey no-arbitrage constraints</div>
+          </div>
+        </div>
+        <blockquote class="takeaway">
+          This is the base paper. It proves generative AI can create mathematically valid synthetic market data, which I use to generate 10,000 future scenarios to stress-test each trade.
+          <span class="attr">— the one-sentence answer, if asked</span>
+        </blockquote>
+      </div></div></div>
+    </div>
+
+    <!-- CARD 5 -->
+    <div class="card" id="card-5">
+      <button class="card-head" aria-expanded="false">
+        <span class="card-num">5</span>
+        <span class="card-head-text">
+          <span class="card-role">The explainer</span>
+          <span class="card-paper">FinRobot: An Open-Source AI Agent Platform for Financial Applications — Yang et al. (2024)</span>
+        </span>
+        <span class="card-chevron">▾</span>
+      </button>
+      <div class="card-body"><div class="card-body-inner"><div class="card-content">
+        <div class="field">
+          <div class="field-label">THE PROBLEM</div>
+          <div class="field-body">Deep learning outputs raw tensors and probabilities. A portfolio manager can't read a tensor — the model is a black box.</div>
+        </div>
+        <div class="field">
+          <div class="field-label">THE SOLUTION</div>
+          <div class="field-body">A multi-agent LLM framework where specialized agents read the quantitative output and reason over it in writing, turning numbers into a plain-English case.</div>
+        </div>
+        <div class="io-row">
+          <div class="io-box">
+            <div class="field-label">IN</div>
+            <div class="field-body">The raw math — CNN anomaly coordinates, VolGAN survival probabilities</div>
+          </div>
+          <div class="io-box">
+            <div class="field-label">OUT</div>
+            <div class="field-body">A plain-English paragraph explaining why a trade should (or shouldn't) be made</div>
+          </div>
+        </div>
+        <blockquote class="takeaway">
+          I use this paper's multi-agent framework for explainable AI — it translates the black-box tensor outputs of the GAN into a transparent trading rationale.
+          <span class="attr">— the one-sentence answer, if asked</span>
+        </blockquote>
+      </div></div></div>
+    </div>
+  </section>
+
+  <section class="assembly-section" id="assembly" aria-label="Sheet 6, connecting the dots">
+    <div class="section-heading"><h2>Sheet 6 — connecting the dots</h2></div>
+    <p class="dek" style="margin-top:0;">If the professor asks "how do all these papers fit into one project?" — this is the walkthrough.</p>
+    <ol class="assembly-list">
+      <li>
+        <div>
+          <div class="step-title">The setup</div>
+          <div class="step-body">Pull real options data and run it through Carr–Madan (Sheet 1) to find out what the price <em>should</em> be in a perfect world.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">The discovery</div>
+          <div class="step-body">Hand that data to the CNN (Sheet 2). It compares the real world to the perfect math and flags the exact coordinate where a mispricing exists.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">The compression</div>
+          <div class="step-body">Before testing that mispricing, summarize the whole market. The VAE (Sheet 3) compresses it into a tiny "regime" state.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">The stress test</div>
+          <div class="step-body">No trading yet. Feed the compressed regime into VolGAN (Sheet 4): "generate 10,000 possible futures based on this regime," then simulate the trade across all of them to see if it survives.</div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <div class="step-title">The final output</div>
+          <div class="step-body">Pass the VolGAN survival rate and the CNN coordinates to the FinRobot LLM (Sheet 5), which writes out the case in plain English.</div>
+        </div>
+      </li>
+    </ol>
+    <div class="final-line">
+      <span class="prompt">&gt; </span><span class="out">CNN found an anomaly. VolGAN confirms 85% survival rate across 10,000 futures. ACTION: EXECUTE TRADE.</span>
+    </div>
+  </section>
+
+  <footer>
+    Study reference for a project defense — memorize the inputs, outputs, and the "why," not the math.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var nodes = Array.from(document.querySelectorAll('.node[data-node]'));
+  var fills = Array.from(document.querySelectorAll('.fill'));
+  var caption = document.getElementById('captionPanel');
+  var playBtn = document.getElementById('playBtn');
+  var toggleAllBtn = document.getElementById('toggleAll');
+  var cards = Array.from(document.querySelectorAll('.card'));
+  var playing = false;
+
+  var steps = [
+    { tag: 'STAGE 0 · SETUP', text: 'Real options data enters the pipeline — strikes and expiries, straight from the market.' },
+    { tag: 'STAGE 1 · CARR–MADAN', text: 'FFT computes what every price should be in a perfect, frictionless world. This is the ground truth.' },
+    { tag: 'STAGE 2 · CNN', text: 'The CNN compares real prices to that perfect math and flags the exact coordinate of a mispricing.' },
+    { tag: 'STAGE 3 · VAE', text: 'Before testing the mispricing, the whole market gets compressed into one small "regime" vector.' },
+    { tag: 'STAGE 4 · VOLGAN', text: 'VolGAN generates 10,000 possible future surfaces from that regime. The trade is simulated across all of them.' },
+    { tag: 'STAGE 5 · FINROBOT', text: 'The survival rate and anomaly data are handed to the LLM agent, which writes the plain-English case.' },
+    { tag: 'STAGE 6 · OUTPUT', text: '"CNN found an anomaly. VolGAN confirms 85% survival rate across 10,000 futures. ACTION: EXECUTE TRADE."' }
+  ];
+
+  function clearActive() {
+    nodes.forEach(function (n) { n.classList.remove('active'); });
+  }
+
+  function setCaption(step) {
+    caption.innerHTML = '<span class="step-tag">' + step.tag + '</span>' + step.text;
+  }
+
+  function jumpTo(nodeEl) {
+    clearActive();
+    nodeEl.classList.add('active');
+    var idx = nodeEl.getAttribute('data-node');
+    setCaption(steps[idx]);
+    var cardId = nodeEl.getAttribute('data-card');
+    if (cardId) {
+      var card = document.getElementById(cardId);
+      openCard(card);
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  nodes.forEach(function (n) {
+    if (n.classList.contains('is-endpoint')) return;
+    n.addEventListener('click', function () { jumpTo(n); });
+    n.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jumpTo(n); }
+    });
+  });
+
+  function resetFills() {
+    fills.forEach(function (f) {
+      f.style.transitionDuration = '0s';
+      f.style.width = '0%';
+      f.style.height = '0%';
+      void f.offsetWidth;
+      f.style.transitionDuration = '';
+    });
+  }
+
+  function playSequence() {
+    if (playing) return;
+    playing = true;
+    playBtn.disabled = true;
+    playBtn.textContent = '▶ Playing…';
+    resetFills();
+    clearActive();
+    setCaption(steps[0]);
+
+    var order = [0, 1, 2, 3, 4, 5, 6];
+    var i = 0;
+
+    function step() {
+      if (i >= order.length) {
+        playing = false;
+        playBtn.disabled = false;
+        playBtn.textContent = '▶ Play the assembly line';
+        return;
+      }
+      var idx = order[i];
+      var node = nodes[idx];
+      clearActive();
+      node.classList.add('active');
+      setCaption(steps[idx]);
+
+      var fill = fills[idx];
+      if (fill) {
+        var vertical = window.matchMedia('(max-width: 700px)').matches;
+        if (vertical) { fill.style.height = '100%'; } else { fill.style.width = '100%'; }
+      }
+      i++;
+      setTimeout(step, 1400);
+    }
+    step();
+  }
+
+  playBtn.addEventListener('click', playSequence);
+
+  function openCard(card) {
+    if (!card.classList.contains('open')) {
+      card.classList.add('open');
+      card.querySelector('.card-head').setAttribute('aria-expanded', 'true');
+    }
+  }
+  function closeCard(card) {
+    card.classList.remove('open');
+    card.querySelector('.card-head').setAttribute('aria-expanded', 'false');
+  }
+
+  cards.forEach(function (card) {
+    var head = card.querySelector('.card-head');
+    head.addEventListener('click', function () {
+      if (card.classList.contains('open')) { closeCard(card); } else { openCard(card); }
+    });
+  });
+
+  var allOpen = false;
+  toggleAllBtn.addEventListener('click', function () {
+    allOpen = !allOpen;
+    cards.forEach(function (card) { allOpen ? openCard(card) : closeCard(card); });
+    toggleAllBtn.textContent = allOpen ? 'Collapse all' : 'Expand all';
+  });
+})();
+</script>
+
+</body>
+</html>
